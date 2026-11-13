@@ -1,0 +1,20 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: bigmodel-db
+    environment:
+      POSTGRES_USER: bigmodel
+      POSTGRES_PASSWORD: bigmodel
+      POSTGRES_DB: bigmodel
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bigmodel -d bigmodel"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  db_data:
