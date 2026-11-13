@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func envOf(m map[string]string) GetEnv {
 	return func(k string) string { return m[k] }
@@ -31,6 +34,7 @@ func TestLoadOverrides(t *testing.T) {
 		"DATABASE_URL":  "postgresql://u:p@db:5432/x?sslmode=require",
 		"APP_DATA_DIR":  "/var/lib/bigmodel",
 		"APP_LOG_LEVEL": "DEBUG",
+		"APP_SESSION_TTL": "24h",
 	}))
 	if err != nil {
 		t.Fatalf("覆盖配置应可用: %v", err)
@@ -43,6 +47,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Errorf("LogLevel 应统一小写, got %q", cfg.LogLevel)
+	}
+	if cfg.SessionTTL != 24*time.Hour {
+		t.Errorf("SessionTTL = %v", cfg.SessionTTL)
 	}
 }
 
@@ -65,6 +72,7 @@ func TestLoadRejectsInvalid(t *testing.T) {
 	}{
 		{"不支持的数据库协议", map[string]string{"DATABASE_URL": "mysql://u:p@localhost/db"}},
 		{"不支持的日志级别", map[string]string{"APP_LOG_LEVEL": "verbose"}},
+		{"非法会话时长", map[string]string{"APP_SESSION_TTL": "abc"}},
 	}
 	for _, tc := range cases {
 		if _, err := Load(envOf(tc.env)); err == nil {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // Config 是进程启动所需的部署配置。
@@ -15,6 +16,7 @@ type Config struct {
 	DatabaseURL string // PostgreSQL 连接串
 	DataDir     string // 原始资料等本地持久化目录
 	LogLevel    string // debug / info / warn / error
+	SessionTTL  time.Duration // 会话有效期
 }
 
 // GetEnv 取环境变量的函数类型，便于测试注入。
@@ -32,6 +34,13 @@ func Load(get GetEnv) (Config, error) {
 		DataDir:     firstNonEmpty(get("APP_DATA_DIR"), "./data"),
 		LogLevel:    strings.ToLower(strings.TrimSpace(firstNonEmpty(get("APP_LOG_LEVEL"), "info"))),
 	}
+
+	ttlRaw := firstNonEmpty(get("APP_SESSION_TTL"), "12h")
+	ttl, err := time.ParseDuration(ttlRaw)
+	if err != nil || ttl <= 0 {
+		return Config{}, fmt.Errorf("APP_SESSION_TTL 非法: %q", ttlRaw)
+	}
+	cfg.SessionTTL = ttl
 
 	if !strings.HasPrefix(cfg.DatabaseURL, "postgres://") && !strings.HasPrefix(cfg.DatabaseURL, "postgresql://") {
 		return Config{}, errors.New("DATABASE_URL 必须是 postgres:// 或 postgresql:// 连接串")

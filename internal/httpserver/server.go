@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/hequan2017/bigmodel/internal/api"
+	"github.com/hequan2017/bigmodel/internal/auth"
 	"github.com/hequan2017/bigmodel/internal/config"
 )
 
@@ -18,6 +19,7 @@ import (
 type Server struct {
 	cfg  config.Config
 	pool *pgxpool.Pool
+	auth *auth.Service
 	log  *slog.Logger
 	http *http.Server
 }
@@ -25,10 +27,14 @@ type Server struct {
 // New 构造 HTTP 服务。
 func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) *Server {
 	s := &Server{cfg: cfg, pool: pool, log: log}
+	s.auth = auth.NewService(pool, cfg.SessionTTL)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleLiveness)
 	mux.HandleFunc("GET /readyz", s.handleReadiness)
+	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", s.requireAuth(s.handleLogout))
+	mux.HandleFunc("GET /api/auth/me", s.requireAuth(s.handleMe))
 	mux.HandleFunc("/", s.handleNotFound)
 
 	s.http = &http.Server{

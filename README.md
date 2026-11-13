@@ -10,10 +10,13 @@ Go 大模型应用开发平台（MVP）：知识问答链路 + 在线考试链�
 # 1. 启动 PostgreSQL（含 pgvector）
 docker compose up -d db
 
-# 2. 编译并运行（启动时自动执行数据库迁移）
+# 2. 初始化演示账号（admin / teacher / student，幂等可重复执行）
+go run ./cmd/seed
+
+# 3. 编译并运行（启动时自动执行数据库迁移）
 go run ./cmd/server
 
-# 3. 健康检查
+# 4. 健康检查
 curl http://127.0.0.1:8080/healthz
 curl http://127.0.0.1:8080/readyz
 ```
@@ -26,22 +29,44 @@ curl http://127.0.0.1:8080/readyz
 | DATABASE_URL | `postgres://bigmodel:bigmodel@localhost:5432/bigmodel?sslmode=disable` | PostgreSQL 连接串（含口令，勿写入日志） |
 | APP_DATA_DIR | `./data` | 原始资料等本地持久化目录 |
 | APP_LOG_LEVEL | `info` | debug / info / warn / error |
+| APP_SESSION_TTL | `12h` | 会话有效期（Go duration） |
+| APP_SEED_*_PASSWORD | 见下方演示账号表 | 初始化账号口令（仅 seed 使用） |
 
 ## 目录结构
 
 ```
 cmd/server          入口进程
+cmd/seed            预置演示账号初始化
 internal/config     部署配置加载（环境变量）
 internal/database   连接池与迁移执行
 internal/api        统一响应/错误结构与 request_id
+internal/auth       登录认证、会话与角色权限
+internal/audit      关键操作留痕
 internal/httpserver 路由、中间件与健康检查
 migrations          内嵌 SQL 迁移（启动时自动按序执行）
+```
+
+## 演示账号
+
+| 登录名 | 默认口令（环境变量覆盖） | 角色 |
+|---|---|---|
+| admin | `admin@123`（APP_SEED_ADMIN_PASSWORD） | 管理员 |
+| teacher | `teacher@123`（APP_SEED_TEACHER_PASSWORD） | 教师 |
+| student | `student@123`（APP_SEED_STUDENT_PASSWORD） | 学生 |
+
+登录后携带 `Authorization: Bearer <token>` 访问业务接口：
+
+```bash
+TOKEN=$(curl -s -X POST http://127.0.0.1:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"login_name":"teacher","password":"teacher@123"}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])')
+curl -s http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN"
 ```
 
 ## 当前进度（P0）
 
 - [x] ① 项目骨架 / 配置加载 / 数据库迁移 / 健康检查
-- [ ] ② 登录认证与 admin/teacher/student 三角色权限
+- [x] ② 登录认证与 admin/teacher/student 三角色权限
 - [ ] ③ 模型接入（ChatClient / EmbeddingClient 与连通性验证）
 - [ ] ④ 知识库创建与 TXT/Markdown 文档上传
 - [ ] ⑤ 文档解析/切分/向量化 worker 与状态机
