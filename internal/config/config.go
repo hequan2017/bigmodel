@@ -18,6 +18,8 @@ type Config struct {
 	LogLevel    string        // debug / info / warn / error
 	SessionTTL  time.Duration // 会话有效期
 
+	RunTimeout time.Duration // 单次问答运行总时长上限（§5.3 超时落地）
+
 	// 模型服务（OpenAI 兼容协议）。端点与密钥由部署环境注入，
 	// 密钥只保存在环境变量中，不落库、不进日志与接口响应。
 	ChatBaseURL      string
@@ -46,6 +48,7 @@ func Load(get GetEnv) (Config, error) {
 		ChatAPIKey:       strings.TrimSpace(get("APP_CHAT_API_KEY")),
 		ChatModel:        strings.TrimSpace(get("APP_CHAT_MODEL")),
 		EmbeddingBaseURL: strings.TrimRight(strings.TrimSpace(get("APP_EMBEDDING_BASE_URL")), "/"),
+		RunTimeout:       parseRunTimeout(firstNonEmpty(get("APP_RUN_TIMEOUT"), "180s")),
 		EmbeddingAPIKey:  strings.TrimSpace(get("APP_EMBEDDING_API_KEY")),
 		EmbeddingModel:   strings.TrimSpace(get("APP_EMBEDDING_MODEL")),
 	}
@@ -66,6 +69,14 @@ func Load(get GetEnv) (Config, error) {
 		return Config{}, fmt.Errorf("APP_LOG_LEVEL 不支持: %q", cfg.LogLevel)
 	}
 	return cfg, nil
+}
+
+func parseRunTimeout(raw string) time.Duration {
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return 180 * time.Second
+	}
+	return d
 }
 
 func firstNonEmpty(values ...string) string {

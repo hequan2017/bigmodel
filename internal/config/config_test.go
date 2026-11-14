@@ -85,3 +85,27 @@ func TestLoadRejectsInvalid(t *testing.T) {
 		}
 	}
 }
+
+func TestRunTimeoutConfig(t *testing.T) {
+	cfg, err := Load(envOf(map[string]string{}))
+	if err != nil {
+		t.Fatalf("默认配置: %v", err)
+	}
+	if cfg.RunTimeout.String() != "3m0s" {
+		t.Errorf("默认 RunTimeout 应 3m, got %v", cfg.RunTimeout)
+	}
+	cfg2, err := Load(envOf(map[string]string{"APP_RUN_TIMEOUT": "5m"}))
+	if err != nil {
+		t.Fatalf("加载: %v", err)
+	}
+	if cfg2.RunTimeout.String() != "5m0s" {
+		t.Errorf("覆盖 RunTimeout = %v", cfg2.RunTimeout)
+	}
+	cfg3, err := Load(envOf(map[string]string{"APP_RUN_TIMEOUT": "abc"}))
+	if err != nil {
+		t.Fatalf("非法值应回退默认而非报错: %v", err)
+	}
+	if cfg3.RunTimeout.String() != "3m0s" {
+		t.Errorf("非法值回退 = %v", cfg3.RunTimeout)
+	}
+}

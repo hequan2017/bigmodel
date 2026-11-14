@@ -31,13 +31,21 @@ const (
 
 // Service 聚合应用配置与运行逻辑；kb 用于运行期检索。
 type Service struct {
-	pool *pgxpool.Pool
-	kb   *kb.Service
+	pool       *pgxpool.Pool
+	kb         *kb.Service
+	runTimeout time.Duration
 }
 
 // NewService 构造应用服务。
 func NewService(pool *pgxpool.Pool, kbSvc *kb.Service) *Service {
-	return &Service{pool: pool, kb: kbSvc}
+	return &Service{pool: pool, kb: kbSvc, runTimeout: 180 * time.Second}
+}
+
+// SetRunTimeout 设置单次运行总时长上限（部署可按模型延迟调整）。
+func (s *Service) SetRunTimeout(d time.Duration) {
+	if d > 0 {
+		s.runTimeout = d
+	}
 }
 
 func isUniqueViolation(err error) bool {
@@ -463,7 +471,7 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 	start := time.Now()
 	var answer strings.Builder
 	var usage *model.Usage
-	streamCtx, cancel := context.WithTimeout(ctx, runTimeout)
+	streamCtx, cancel := context.WithTimeout(ctx, s.runTimeout)
 	defer cancel()
 
 	err = p.Chat.Stream(streamCtx, model.ChatRequest{

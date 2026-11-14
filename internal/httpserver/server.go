@@ -45,6 +45,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	s := &Server{cfg: cfg, pool: pool, log: log, models: models, kb: kbSvc}
 	s.auth = auth.NewService(pool, cfg.SessionTTL)
 	s.apps = app.NewService(pool, s.kb)
+	s.apps.SetRunTimeout(cfg.RunTimeout)
 	s.exam = exam.NewService(pool)
 
 	mux := http.NewServeMux()
