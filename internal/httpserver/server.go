@@ -90,6 +90,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/exam/exams/{id}/attempts/submit", s.requireAuth(s.requireRole(s.handleSubmitAttempt, auth.RoleStudent)))
 	mux.HandleFunc("GET /api/exam/exams/{id}/attempts/result", s.requireAuth(s.requireRole(s.handleAttemptResult, auth.RoleStudent)))
 	mux.HandleFunc("GET /api/exam/exams/{id}/results", s.requireAuth(s.requireRole(s.handleExamResults, kbRoles...)))
+	mux.HandleFunc("GET /api/exam/exams/{id}/attempts/{attemptID}", s.requireAuth(s.requireRole(s.handleAttemptDetail, kbRoles...)))
 	mux.HandleFunc("GET /api/exam/available", s.requireAuth(s.requireRole(s.handleAvailableExams, auth.RoleStudent)))
 
 	// 学生端页面同源托管（§15.1）；非 GET 的根路径仍走统一 JSON 404。

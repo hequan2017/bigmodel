@@ -114,7 +114,8 @@
     </div>
     <div class="card hidden" id="resultsBox">
       <h3>成绩列表：<span id="resultsExamTitle"></span></h3>
-      <table id="rTable"><thead><tr><th>学生</th><th>状态</th><th>总分</th><th>提交时间</th><th>提交原因</th></tr></thead><tbody></tbody></table>
+      <table id="rTable"><thead><tr><th>学生</th><th>状态</th><th>总分</th><th>提交时间</th><th>提交原因</th><th></th></tr></thead><tbody></tbody></table>
+      <div id="detailBox" class="hidden" style="margin-top:14px"><h3>作答详情</h3><div id="detailBody"></div></div>
     </div>
   </section>
 
@@ -347,6 +348,7 @@ async function deleteExam(id) {
   try { await api("DELETE", `/api/exam/exams/${id}`); loadExams(); } catch (e) { alert(e.message); }
 }
 async function showResults(id, title) {
+  window.currentResultsExam = id;
   document.getElementById("resultsExamTitle").textContent = title;
   document.getElementById("resultsBox").classList.remove("hidden");
   const d = await api("GET", `/api/exam/exams/${id}/results`);
@@ -357,7 +359,8 @@ async function showResults(id, title) {
     tr.innerHTML = `<td>${r.login_name}</td>
       <td><span class="badge ${r.status === "submitted" ? "ok" : "warn"}">${r.status}</span></td>
       <td>${r.total_score != null ? r.total_score : "-"}</td>
-      <td>${r.submitted_at ? fmtTime(r.submitted_at) : "-"}</td><td>${r.submit_reason || "-"}</td>`;
+      <td>${r.submitted_at ? fmtTime(r.submitted_at) : "-"}</td><td>${r.submit_reason || "-"}</td>
+      <td><button class="act gray" onclick="showDetail(${r.attempt_id})">详情</button></td>`;
     tbody.appendChild(tr);
   }
 }
@@ -403,7 +406,8 @@ async function loadKBs() {
           : `<span class="badge warn">${doc.status}</span>`;
         row.innerHTML = `<span style="min-width:200px">${doc.display_name}</span> ${badge}
           <span class="meta">${doc.char_count} 字符 · 重试 ${doc.retry_count} 次</span>
-          <button class="act gray" onclick="disableDoc(${k.id}, ${doc.id})">停用</button>`;
+          <button class="act gray" onclick="showChunks(${k.id}, ${doc.id}, this)">片段</button>
+          <button class="act red" onclick="disableDoc(${k.id}, ${doc.id})">停用</button>`;
         docs.appendChild(row);
       }
     });
@@ -517,6 +521,42 @@ async function debugRun() {
   } catch (e) {
     out.textContent = "运行失败: " + (e.message || "网络错误");
   }
+}
+
+/* ---------- 作答详情与文档片段 ---------- */
+async function showDetail(attemptId) {
+  const box = document.getElementById("detailBox");
+  const body = document.getElementById("detailBody");
+  box.classList.remove("hidden");
+  body.innerHTML = "加载中...";
+  try {
+    const d = await api("GET",
+      `/api/exam/exams/${window.currentResultsExam}/attempts/${attemptId}`);
+    const det = d.detail;
+    let html = `<div class="meta">${det.login_name} · ${det.status}
+      · 总分 ${det.total_score != null ? det.total_score : "-"}
+      · ${det.submit_reason || ""} · 版本 ${det.answer_revision}</div>
+      <table><thead><tr><th>题号</th><th>题干</th><th>学生答案</th><th>正确答案</th><th>得分</th></tr></thead><tbody>`;
+    for (const it of det.items) {
+      html += `<tr><td>${it.order_no}</td><td>${it.stem}</td>
+        <td><strong>${it.student_answer}</strong></td><td>${it.correct_answer}</td>
+        <td><span class="badge ${it.awarded >= it.full_score ? "ok" : "err"}">${it.awarded}/${it.full_score}</span></td></tr>`;
+    }
+    html += "</tbody></table>";
+    body.innerHTML = html;
+  } catch (e) { body.textContent = e.message || "加载失败"; }
+}
+
+async function showChunks(kbId, docId, btn) {
+  try {
+    const d = await api("GET", `/api/kb/${kbId}/documents/${docId}/chunks`);
+    const pre = document.createElement("pre");
+    pre.className = "refs";
+    pre.textContent = d.chunks.length
+      ? d.chunks.map((c) => `片段${c.index} [${c.start_offset},${c.end_offset}) ${c.heading || ""}\n${c.content}`).join("\n———\n")
+      : "（该文档暂无片段：状态可能尚未 ready 或已停用）";
+    btn.parentElement.insertAdjacentElement("afterend", pre);
+  } catch (e) { alert(e.message || "加载片段失败"); }
 }
 
 /* ---------- 模型 ---------- */
