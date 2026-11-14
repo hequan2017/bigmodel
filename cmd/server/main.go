@@ -20,6 +20,9 @@ import (
 	"github.com/hequan2017/bigmodel/internal/model"
 )
 
+// buildVersion 由构建时 -ldflags -X 注入；本地运行默认 dev。
+var buildVersion = "dev"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "启动失败:", err)
@@ -64,6 +67,7 @@ func run() error {
 
 	kbSvc := kb.NewService(pool, cfg.DataDir)
 	srv := httpserver.New(cfg, pool, logger, modelSvc, kbSvc)
+	srv.SetVersion(buildVersion, time.Now())
 
 	// 到期作答自动结算循环（§14.7）。
 	srv.StartExamSweep(ctx, 30*time.Second)

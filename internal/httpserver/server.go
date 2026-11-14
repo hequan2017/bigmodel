@@ -21,15 +21,23 @@ import (
 
 // Server 持有运行期依赖，全部路由通过它注册。
 type Server struct {
-	cfg    config.Config
-	pool   *pgxpool.Pool
-	auth   *auth.Service
-	models *model.Service
-	kb     *kb.Service
-	apps   *app.Service
-	exam   *exam.Service
-	log    *slog.Logger
-	http   *http.Server
+	cfg       config.Config
+	pool      *pgxpool.Pool
+	auth      *auth.Service
+	models    *model.Service
+	kb        *kb.Service
+	apps      *app.Service
+	exam      *exam.Service
+	log       *slog.Logger
+	http      *http.Server
+	version   string
+	startedAt time.Time
+}
+
+// SetVersion 设置构建版本与启动时间，供 /api/version 展示（运维排障用）。
+func (s *Server) SetVersion(version string, startedAt time.Time) {
+	s.version = version
+	s.startedAt = startedAt
 }
 
 // New 构造 HTTP 服务；models 为模型接入服务，kbSvc 为知识库服务。
@@ -47,6 +55,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("GET /api/auth/me", s.requireAuth(s.handleMe))
 	mux.HandleFunc("GET /api/admin/models", s.requireAuth(s.requireRole(s.handleListModels, auth.RoleAdmin)))
 	mux.HandleFunc("GET /api/admin/audit", s.requireAuth(s.requireRole(s.handleAdminAudit, auth.RoleAdmin)))
+	mux.HandleFunc("GET /api/version", s.handleVersion)
 	mux.HandleFunc("POST /api/admin/models/chat/test", s.requireAuth(s.requireRole(s.handleTestChat, auth.RoleAdmin)))
 	mux.HandleFunc("POST /api/admin/models/embedding/test", s.requireAuth(s.requireRole(s.handleTestEmbedding, auth.RoleAdmin)))
 
@@ -121,4 +130,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // handleNotFound 让未匹配路由也返回统一 JSON 错误结构。
 func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 	api.WriteError(w, r, http.StatusNotFound, "not_found", "接口不存在")
+}
+
+// handleVersion 返回构建版本与启动时间（无认证，无敏感信息）。
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"version":    s.version,
+		"started_at": s.startedAt,
+	})
 }

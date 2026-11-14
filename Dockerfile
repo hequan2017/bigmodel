@@ -7,7 +7,8 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server \
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.buildVersion=${VERSION}" -o /out/server ./cmd/server \
     && CGO_ENABLED=0 go build -trimpath -o /out/seed ./cmd/seed
 
 FROM alpine:3.20
