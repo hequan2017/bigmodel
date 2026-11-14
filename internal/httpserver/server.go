@@ -13,6 +13,7 @@ import (
 	"github.com/hequan2017/bigmodel/internal/api"
 	"github.com/hequan2017/bigmodel/internal/auth"
 	"github.com/hequan2017/bigmodel/internal/config"
+	"github.com/hequan2017/bigmodel/internal/kb"
 	"github.com/hequan2017/bigmodel/internal/model"
 )
 
@@ -22,6 +23,7 @@ type Server struct {
 	pool   *pgxpool.Pool
 	auth   *auth.Service
 	models *model.Service
+	kb     *kb.Service
 	log    *slog.Logger
 	http   *http.Server
 }
@@ -30,6 +32,7 @@ type Server struct {
 func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.Service) *Server {
 	s := &Server{cfg: cfg, pool: pool, log: log, models: models}
 	s.auth = auth.NewService(pool, cfg.SessionTTL)
+	s.kb = kb.NewService(pool, cfg.DataDir)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleLiveness)
@@ -40,6 +43,15 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("GET /api/admin/models", s.requireAuth(s.requireRole(s.handleListModels, auth.RoleAdmin)))
 	mux.HandleFunc("POST /api/admin/models/chat/test", s.requireAuth(s.requireRole(s.handleTestChat, auth.RoleAdmin)))
 	mux.HandleFunc("POST /api/admin/models/embedding/test", s.requireAuth(s.requireRole(s.handleTestEmbedding, auth.RoleAdmin)))
+
+	kbRoles := []string{auth.RoleTeacher, auth.RoleAdmin}
+	mux.HandleFunc("POST /api/kb", s.requireAuth(s.requireRole(s.handleCreateKB, kbRoles...)))
+	mux.HandleFunc("GET /api/kb", s.requireAuth(s.requireRole(s.handleListKBs, kbRoles...)))
+	mux.HandleFunc("GET /api/kb/{id}", s.requireAuth(s.requireRole(s.handleGetKB, kbRoles...)))
+	mux.HandleFunc("POST /api/kb/{id}/documents", s.requireAuth(s.requireRole(s.handleUploadDocument, kbRoles...)))
+	mux.HandleFunc("DELETE /api/kb/{id}/documents/{docID}", s.requireAuth(s.requireRole(s.handleDisableDocument, kbRoles...)))
+	mux.HandleFunc("POST /api/kb/{id}/documents/{docID}/retry", s.requireAuth(s.requireRole(s.handleRetryDocument, kbRoles...)))
+
 	mux.HandleFunc("/", s.handleNotFound)
 
 	s.http = &http.Server{
