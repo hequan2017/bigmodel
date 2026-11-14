@@ -239,8 +239,10 @@ func (s *Service) searchByVector(ctx context.Context, kbID int64,
 }
 
 // searchFullText 是全文检索通道：查询与索引词元均由中文分词生成，
-// 按词项相关性（ts_rank）排序，仅返回 ready 文档片段；
-// 不依赖 Embedding 上游（§7.4 全文通道，非关键词 LIKE 包含查询）。
+// 按 ts_rank 词频相关性排序，索引侧标题词 A 级、正文 C 级加权
+// （setweight；实测与无加权持平，保留为标题信号，见 docs/eval/RESULTS.md
+// 排序变体实验）；仅返回 ready 文档片段；不依赖 Embedding 上游
+// （§7.4 全文通道，非关键词 LIKE 包含查询）。
 func (s *Service) searchFullText(ctx context.Context, kbID int64, req SearchRequest) ([]Candidate, error) {
 	question, err := validateQuestion(req.Question)
 	if err != nil {
@@ -434,19 +436,23 @@ func (s *Service) ReindexFullText(ctx context.Context, userID int64, isAdmin boo
 	var rebuilt int64
 	const batch = 200
 	ids := make([]int64, 0, batch)
-	texts := make([]string, 0, batch)
+	headSegs := make([]string, 0, batch)
+	bodySegs := make([]string, 0, batch)
 	flush := func() error {
 		for i, id := range ids {
 			ct, err := s.pool.Exec(ctx, `
-				UPDATE document_chunks SET fts = to_tsvector('simple', $1) WHERE id = $2`,
-				texts[i], id)
+				UPDATE document_chunks SET fts =
+				        setweight(to_tsvector('simple', $1), 'A') || setweight(to_tsvector('simple', $2), 'C')
+				WHERE id = $3`,
+				headSegs[i], bodySegs[i], id)
 			if err != nil {
 				return fmt.Errorf("重建片段 %d: %w", id, err)
 			}
 			rebuilt += ct.RowsAffected()
 		}
 		ids = ids[:0]
-		texts = texts[:0]
+		headSegs = headSegs[:0]
+		bodySegs = bodySegs[:0]
 		return nil
 	}
 	for rows.Next() {
@@ -456,8 +462,9 @@ func (s *Service) ReindexFullText(ctx context.Context, userID int64, isAdmin boo
 			return 0, fmt.Errorf("扫描片段: %w", err)
 		}
 		ids = append(ids, id)
-		// 与 worker 写入保持一致：标题词并入索引。
-		texts = append(texts, SegmentText(heading+"\n"+content))
+		// 与 worker 写入保持一致：标题 A 级、正文 C 级。
+		headSegs = append(headSegs, SegmentText(heading))
+		bodySegs = append(bodySegs, SegmentText(content))
 		if len(ids) >= batch {
 			if err := flush(); err != nil {
 				return 0, err

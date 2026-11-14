@@ -206,11 +206,12 @@ func (w *Worker) processDocument(ctx context.Context, c *claimedDoc) error {
 	for i, ch := range chunks {
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO document_chunks (document_id, chunk_index, content, start_offset, end_offset, heading, embedding, embedding_model, fts)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, to_tsvector('simple', $9))`,
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+			        setweight(to_tsvector('simple', $9), 'A') || setweight(to_tsvector('simple', $10), 'C'))`,
 			c.ID, ch.Index, ch.Content, ch.StartOffset, ch.EndOffset, ch.Heading,
 			pgvector.NewVector(vectors[i]), w.embedModel,
-			// 标题词一并入索引：章节主题词通常在标题中，仅索引正文会漏检。
-			SegmentText(ch.Heading+"\n"+ch.Content),
+			// 标题词 A 级权重、正文 C 级：章节主题词命中应在排序中占更高权重。
+			SegmentText(ch.Heading), SegmentText(ch.Content),
 		); err != nil {
 			return fmt.Errorf("写入片段 %d: %w", ch.Index, err)
 		}
