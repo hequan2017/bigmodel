@@ -57,6 +57,7 @@ jobs:
             sleep 1
           done
           curl -sf http://127.0.0.1:18080/readyz > /dev/null
-          APP_SEED_TEACHER_PASSWORD=teacher@123 APP_SEED_STUDENT_PASSWORD=student@123 \
+          APP_DATA_DIR=/tmp/bigmodel-e2e \
+            APP_SEED_TEACHER_PASSWORD=teacher@123 APP_SEED_STUDENT_PASSWORD=student@123 \
             go run ./cmd/seed
           bash scripts/e2e-smoke.sh http://127.0.0.1:18080
