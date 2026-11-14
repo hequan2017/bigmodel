@@ -515,7 +515,7 @@ async function loadKBs() {
         const retryBtn = doc.status === "failed"
           ? `<button class="act" onclick="retryDoc(${k.id}, ${doc.id})">重试</button>` : "";
         row.innerHTML = `<span style="min-width:200px">${doc.display_name}</span> ${badge}
-          <span class="meta">${doc.char_count} 字符 · 重试 ${doc.retry_count} 次</span>
+          <span class="meta">${doc.char_count} 字符 · ${doc.chunk_count} 片段 · 重试 ${doc.retry_count} 次</span>
           <button class="act gray" onclick="showChunks(${k.id}, ${doc.id}, this)">片段</button>
           ${retryBtn}
           <button class="act red" onclick="disableDoc(${k.id}, ${doc.id})">停用</button>`;

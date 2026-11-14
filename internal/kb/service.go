@@ -157,9 +157,10 @@ func (s *Service) GetKB(ctx context.Context, userID int64, isAdmin bool, kbID in
 
 func (s *Service) listDocuments(ctx context.Context, kbID int64) ([]Document, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, knowledge_base_id, display_name, content_hash, media_type,
-		       char_count, status, failure_reason, retry_count, created_at, updated_at
-		FROM documents WHERE knowledge_base_id = $1 ORDER BY id DESC`, kbID)
+		SELECT d.id, d.knowledge_base_id, d.display_name, d.content_hash, d.media_type,
+		       d.char_count, d.status, d.failure_reason, d.retry_count, d.created_at, d.updated_at,
+		       (SELECT count(*) FROM document_chunks c WHERE c.document_id = d.id) AS chunk_count
+		FROM documents d WHERE d.knowledge_base_id = $1 ORDER BY d.id DESC`, kbID)
 	if err != nil {
 		return nil, fmt.Errorf("查询文档: %w", err)
 	}
@@ -169,7 +170,8 @@ func (s *Service) listDocuments(ctx context.Context, kbID int64) ([]Document, er
 	for rows.Next() {
 		var d Document
 		if err := rows.Scan(&d.ID, &d.KnowledgeBaseID, &d.DisplayName, &d.ContentHash, &d.MediaType,
-			&d.CharCount, &d.Status, &d.FailureReason, &d.RetryCount, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			&d.CharCount, &d.Status, &d.FailureReason, &d.RetryCount, &d.CreatedAt, &d.UpdatedAt,
+			&d.ChunkCount); err != nil {
 			return nil, fmt.Errorf("读取文档: %w", err)
 		}
 		out = append(out, d)

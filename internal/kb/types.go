@@ -57,6 +57,7 @@ type Document struct {
 	ContentHash     string    `json:"content_hash"`
 	MediaType       string    `json:"media_type"`
 	CharCount       int       `json:"char_count"`
+	ChunkCount      int       `json:"chunk_count"`
 	Status          string    `json:"status"`
 	FailureReason   *string   `json:"failure_reason"`
 	RetryCount      int       `json:"retry_count"`
