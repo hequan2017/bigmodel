@@ -438,3 +438,33 @@ func (s *Service) GetExam(ctx context.Context, userID int64, isAdmin bool, examI
 	}
 	return toExam(e, items), nil
 }
+
+// ListAvailableExams 学生可参加考试列表：仅已发布考试，附带开放窗口状态
+// 与本人作答状态（§15.1）。
+func (s *Service) ListAvailableExams(ctx context.Context, studentID int64) ([]AvailableExam, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT e.id, e.title, e.level_code, e.open_at, e.close_at, e.duration_seconds,
+		       CASE WHEN now() < e.open_at THEN 'not_open'
+		            WHEN now() > e.close_at THEN 'closed'
+		            ELSE 'open' END AS window,
+		       COALESCE(a.status, 'none') AS attempt_status, a.total_score
+		FROM exams e
+		LEFT JOIN exam_attempts a ON a.exam_id = e.id AND a.user_id = $1
+		WHERE e.status = 'published'
+		ORDER BY e.id DESC`, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("查询可参加考试: %w", err)
+	}
+	defer rows.Close()
+
+	out := []AvailableExam{}
+	for rows.Next() {
+		var a AvailableExam
+		if err := rows.Scan(&a.ID, &a.Title, &a.LevelCode, &a.OpenAt, &a.CloseAt,
+			&a.DurationSeconds, &a.Window, &a.AttemptStatus, &a.TotalScore); err != nil {
+			return nil, fmt.Errorf("读取可参加考试: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}

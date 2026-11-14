@@ -425,3 +425,14 @@ func (s *Server) handleExamResults(w http.ResponseWriter, r *http.Request) {
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"results": rows})
 }
+
+// handleAvailableExams 学生可参加考试列表。
+func (s *Server) handleAvailableExams(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	exams, err := s.exam.ListAvailableExams(r.Context(), current.ID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"exams": exams})
+}

@@ -69,3 +69,16 @@ type ExamItemInput struct {
 	OrderNo          int   `json:"order_no"`
 	Score            int   `json:"score"`
 }
+
+// AvailableExam 是学生可参加考试列表项（§15.1）。
+type AvailableExam struct {
+	ID              int64     `json:"id"`
+	Title           string    `json:"title"`
+	LevelCode       string    `json:"level_code"`
+	OpenAt          time.Time `json:"open_at"`
+	CloseAt         time.Time `json:"close_at"`
+	DurationSeconds int       `json:"duration_seconds"`
+	Window          string    `json:"window"`         // not_open / open / closed
+	AttemptStatus   string    `json:"attempt_status"` // none / in_progress / submitted
+	TotalScore      *int      `json:"total_score,omitempty"`
+}

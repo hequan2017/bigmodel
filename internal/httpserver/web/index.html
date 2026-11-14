@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 能力考试平台 · 登录</title>
+<style>
+  body { font-family: system-ui, "PingFang SC", sans-serif; background: #f4f6f9; display: flex;
+         justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+          padding: 32px 40px; width: 320px; }
+  h1 { font-size: 20px; margin: 0 0 20px; color: #1f2937; }
+  input { width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 14px;
+          border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+  button { width: 100%; padding: 10px; background: #2563eb; color: #fff; border: 0;
+           border-radius: 6px; font-size: 14px; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  #msg { margin-top: 12px; font-size: 13px; color: #dc2626; min-height: 18px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>AI 能力考试平台</h1>
+  <form id="login">
+    <input id="u" placeholder="登录名" autocomplete="username" required>
+    <input id="p" type="password" placeholder="密码" autocomplete="current-password" required>
+    <button type="submit">登录</button>
+    <div id="msg"></div>
+  </form>
+</div>
+<script>
+document.getElementById("login").onsubmit = async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("msg");
+  msg.textContent = "";
+  try {
+    const r = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ login_name: document.getElementById("u").value,
+                             password: document.getElementById("p").value }),
+    });
+    const d = await r.json();
+    if (!r.ok) { msg.textContent = d.error ? d.error.message : "登录失败"; return; }
+    sessionStorage.setItem("token", d.token);
+    sessionStorage.setItem("role", d.user.role);
+    sessionStorage.setItem("name", d.user.login_name);
+    if (d.user.role === "student") { location.href = "/exam.html"; return; }
+    msg.style.color = "#059669";
+    msg.textContent = "登录成功。教师/管理员端页面不在本期范围（P0 仅交付学生端考试页面），请使用 API。";
+  } catch (err) {
+    msg.textContent = "网络错误，请稍后重试";
+  }
+};
+</script>
+</body>
+</html>
