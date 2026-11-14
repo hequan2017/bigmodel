@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -60,4 +63,21 @@ jobs:
           APP_DATA_DIR=/tmp/bigmodel-e2e \
             APP_SEED_TEACHER_PASSWORD=teacher@123 APP_SEED_STUDENT_PASSWORD=student@123 \
             go run ./cmd/seed
-          bash scripts/e2e-smoke.sh http://127.0.0.1:18080
+          set +e
+          bash scripts/e2e-smoke.sh http://127.0.0.1:18080 > /tmp/e2e-out.txt 2>&1
+          RC=$?
+          cat /tmp/e2e-out.txt
+          if [ $RC -ne 0 ]; then
+            {
+              echo "=== e2e 输出 ==="; cat /tmp/e2e-out.txt
+              echo "=== server.log ==="; tail -30 /tmp/server.log
+              echo "=== mock.log ==="; tail -10 /tmp/mock.log
+            } > /tmp/ci-diag.txt
+            git config user.email ci-debug@local
+            git config user.name ci-debug
+            git checkout -B ci-debug 2>/dev/null || git checkout ci-debug
+            mkdir -p ci-diag && cp /tmp/ci-diag.txt ci-diag/diag.txt
+            git add ci-diag && git commit -m "ci-debug: E2E 诊断（运行 ${{ github.run_id }}）" && \
+              git push origin ci-debug || echo "诊断推送失败"
+          fi
+          exit $RC
