@@ -817,3 +817,20 @@ func (s *Service) ListConversations(ctx context.Context, userID, appID int64) ([
 	}
 	return out, rows.Err()
 }
+
+// DeleteConversation 删除本人某应用的指定会话消息（多会话管理）。
+// 仅删除消息记录；app_runs 运行记录保留（审计口径）。幂等。
+func (s *Service) DeleteConversation(ctx context.Context, userID, appID int64, conversationID string) error {
+	if strings.TrimSpace(conversationID) == "" {
+		return ErrNotFound
+	}
+	tag, err := s.pool.Exec(ctx, `
+		DELETE FROM app_messages
+		WHERE app_id = $1 AND user_id = $2 AND conversation_id = $3`,
+		appID, userID, conversationID)
+	if err != nil {
+		return fmt.Errorf("删除会话消息: %w", err)
+	}
+	_ = tag
+	return nil
+}

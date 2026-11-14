@@ -533,3 +533,68 @@ func TestDebugPublishedModeIntegration(t *testing.T) {
 		t.Errorf("无发布快照强制按发布应 404, got %v", err)
 	}
 }
+
+func TestDeleteConversationIntegration(t *testing.T) {
+	svc, kbSvc, pool := newTestEnv(t)
+	ctx := context.Background()
+
+	suffix := "dc_" + t.Name()
+	teacherID := createAppTestUser(t, pool, "itest_dc_t_"+suffix)
+	studentID := createStudent(t, pool, "itest_dc_s_"+suffix)
+	other := createStudent(t, pool, "itest_dc_o_"+suffix)
+	embed := &fakeEmbedder{dim: 4}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO model_profiles (name, kind, model_name, base_url, credential_ref)
+		VALUES ($1, 'embedding', 'itest-model', 'http://127.0.0.1:1', 'ITEST')`,
+		"itest-dc-emb-"+suffix); err != nil {
+		t.Fatalf("创建测试档案: %v", err)
+	}
+
+	kbRow, err := kbSvc.CreateKB(ctx, teacherID, "会话删除测试库", "")
+	if err != nil {
+		t.Fatalf("创建知识库: %v", err)
+	}
+	seedReadyDoc(t, kbSvc, kbRow.ID, teacherID, embed)
+
+	a, err := svc.CreateDraft(ctx, teacherID, "会话删除应用", AppConfig{
+		KnowledgeBaseID: kbRow.ID, Prompt: "{{question}}", TopK: 5, HistoryTurns: 1})
+	if err != nil {
+		t.Fatalf("创建应用: %v", err)
+	}
+	if _, err := svc.Publish(ctx, teacherID, "teacher", false, a.ID); err != nil {
+		t.Fatalf("发布: %v", err)
+	}
+
+	// 学生两次运行（同一会话）→ 4 条消息。
+	chat := &fakeChat{}
+	conv := "delconv-" + suffix
+	for _, q := range []string{"问一", "问二"} {
+		if err := svc.RunApp(ctx, RunParams{
+			UserID: studentID, Role: "student", AppID: a.ID, Question: q,
+			ConversationID: conv,
+			Chat:           chat, ChatModel: "mock-chat", Embed: embed, EmbedModel: "fake-embed",
+		}, func(Event) error { return nil }); err != nil {
+			t.Fatalf("运行 %s: %v", q, err)
+		}
+	}
+
+	// 他人删除同名会话 → 不影响本人消息。
+	if err := svc.DeleteConversation(ctx, other, a.ID, conv); err != nil {
+		t.Fatalf("他人删除: %v", err)
+	}
+	if msgs, err := svc.ListMessages(ctx, studentID, a.ID, conv); err != nil || len(msgs) != 4 {
+		t.Fatalf("他人删除不应影响本人消息: len=%d err=%v", len(msgs), err)
+	}
+
+	// 本人删除 → 消息清空（幂等）。
+	if err := svc.DeleteConversation(ctx, studentID, a.ID, conv); err != nil {
+		t.Fatalf("本人删除: %v", err)
+	}
+	if err := svc.DeleteConversation(ctx, studentID, a.ID, conv); err != nil {
+		t.Fatalf("重复删除应幂等: %v", err)
+	}
+	if msgs, err := svc.ListMessages(ctx, studentID, a.ID, conv); err != nil || len(msgs) != 0 {
+		t.Errorf("删除后消息应为空: len=%d err=%v", len(msgs), err)
+	}
+}

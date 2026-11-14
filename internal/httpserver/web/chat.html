@@ -47,6 +47,7 @@
       <label class="meta">会话</label>
       <select id="convSel" style="flex:1" onchange="onConvChange()"><option value="">新会话</option></select>
       <button class="act gray" onclick="newConversation()">新会话</button>
+      <button class="act gray" style="background:#dc2626" onclick="deleteConversation()">删除会话</button>
     </div>
     <div id="chat"></div>
     <div class="row" style="margin-top:12px">
@@ -197,6 +198,20 @@ function onConvChange() {
   conversationId = document.getElementById("convSel").value || "";
   sessionStorage.setItem(convKey(), conversationId);
   restoreConversation();
+}
+
+async function deleteConversation() {
+  if (!conversationId) return;
+  if (!confirm("确定删除当前会话的全部消息记录吗？")) return;
+  try {
+    await api("DELETE", `/api/apps/${document.getElementById("appSel").value}/conversations/${encodeURIComponent(conversationId)}`);
+    sessionStorage.removeItem(convKey());
+    conversationId = "";
+    document.getElementById("convSel").value = "";
+    document.getElementById("chat").innerHTML = "";
+    document.getElementById("chatMsg").textContent = "会话已删除 · 已开启新会话";
+    await refreshConversations();
+  } catch (e) { alert("删除失败: " + (e.message || "未知错误")); }
 }
 
 async function newConversation() {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/hequan2017/bigmodel/internal/api"
 	"github.com/hequan2017/bigmodel/internal/app"
@@ -344,4 +345,20 @@ func (s *Server) handleAppConversations(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"conversations": conversations})
+}
+
+// handleDeleteConversation 学生删除本人指定会话的消息记录（幂等）。
+func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	appID, ok1 := pathID(r, "id")
+	convID := r.PathValue("conversationID")
+	if !ok1 || strings.TrimSpace(convID) == "" {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "ID 非法")
+		return
+	}
+	if err := s.apps.DeleteConversation(r.Context(), current.ID, appID, convID); err != nil {
+		s.writeAppError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
