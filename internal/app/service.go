@@ -452,13 +452,19 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 	// 历史上下文：仅成功运行进入历史，且不同用户/应用不交叉（§9.3）。
 	history := s.loadHistory(ctx, p.AppID, p.UserID, conv, cfg.HistoryTurns)
 
-	cands, serr := s.kb.SearchForApp(ctx, cfg.KnowledgeBaseID,
+	cands, stats, serr := s.kb.SearchForApp(ctx, cfg.KnowledgeBaseID,
 		kb.SearchRequest{Question: question, TopK: cfg.TopK}, p.Embed, p.EmbedModel)
 	if serr != nil {
 		code, msg := upstreamCode(serr)
 		_ = s.markRun(markCtx, runID, RunFailed, code, 0)
 		_ = emit(Event{Type: "error", Payload: map[string]any{"code": code, "message": msg}})
 		return nil
+	}
+	// 每路检索通道的候选数/耗时/降级原因随运行记录保存（§7.4 第 7 步）。
+	if len(stats) > 0 {
+		if b, merr := json.Marshal(stats); merr == nil {
+			_ = s.saveRetrievalStats(markCtx, runID, b)
+		}
 	}
 	if err := emit(Event{Type: "references", Payload: map[string]any{"references": buildRefs(cands)}}); err != nil {
 		_ = s.markRun(markCtx, runID, RunCanceled, "", 0)
@@ -595,6 +601,18 @@ func (s *Service) markRun(ctx context.Context, runID int64, status, errorCode st
 		runID, status, nullableString(errorCode), nullableInt(durationMs),
 	); err != nil {
 		return fmt.Errorf("更新运行记录: %w", err)
+	}
+	return nil
+}
+
+// saveRetrievalStats 把每路检索通道的统计写入运行记录（§7.4 第 7 步）。
+// 写入失败不影响运行主流程（审计性元数据，尽力而为）。
+func (s *Service) saveRetrievalStats(ctx context.Context, runID int64, stats []byte) error {
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE app_runs SET retrieval_stats = $2 WHERE id = $1`,
+		runID, stats,
+	); err != nil {
+		return fmt.Errorf("写入检索统计: %w", err)
 	}
 	return nil
 }

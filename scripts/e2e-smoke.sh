@@ -56,6 +56,17 @@ SEARCH=$(curl -s --noproxy '*' -X POST "$BASE/api/kb/$KB/search" -H "$AH_T" -H '
 REFS=$(echo "$SEARCH" | jqpy 'len(d["candidates"])')
 [ "$REFS" -ge 1 ] 2>/dev/null && pass "向量检索命中" || fail "向量检索命中（${REFS}）"
 
+FTS_HITS=$(curl -s --noproxy '*' -X POST "$BASE/api/kb/$KB/search" -H "$AH_T" -H 'Content-Type: application/json' \
+  -d '{"question":"RAG 的基本流程","top_k":2,"mode":"fulltext"}' | jqpy 'len(d["candidates"])')
+[ "$FTS_HITS" -ge 1 ] 2>/dev/null && pass "全文检索命中" || fail "全文检索命中（${FTS_HITS}）"
+
+HYB_CHANNEL=$(curl -s --noproxy '*' -X POST "$BASE/api/kb/$KB/search" -H "$AH_T" -H 'Content-Type: application/json' \
+  -d '{"question":"RAG 的基本流程","top_k":2}' | jqpy 'd["candidates"][0]["retrieval_channel"]')
+check "默认混合检索通道" "$HYB_CHANNEL" "hybrid"
+
+CODE=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X POST "$BASE/api/kb/$KB/reindex" -H "$AH_T")
+check "全文索引重建" "$CODE" "200"
+
 # ---------- 问答应用 ----------
 APP=$(curl -s --noproxy '*' -X POST "$BASE/api/apps" -H "$AH_T" -H 'Content-Type: application/json' \
   -d "{\"name\":\"冒烟测试应用 $TS\",\"config\":{\"knowledge_base_id\":$KB,\"prompt\":\"资料:\\n{{context}}\\n问题: {{question}}\",\"top_k\":3,\"history_turns\":1}}" \

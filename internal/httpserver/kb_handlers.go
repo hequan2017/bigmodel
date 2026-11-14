@@ -31,6 +31,8 @@ func (s *Server) writeKBError(w http.ResponseWriter, r *http.Request, err error)
 		api.WriteError(w, r, http.StatusConflict, "invalid_state", "当前文档状态不允许该操作")
 	case errors.Is(err, kb.ErrInvalidQuestion):
 		api.WriteError(w, r, http.StatusBadRequest, "invalid_question", err.Error())
+	case errors.Is(err, kb.ErrInvalidMode):
+		api.WriteError(w, r, http.StatusBadRequest, "invalid_mode", err.Error())
 	case errors.Is(err, kb.ErrDimensionMismatch):
 		api.WriteError(w, r, http.StatusConflict, "dimension_mismatch", "查询向量维度与知识库索引不一致")
 	default:
@@ -199,7 +201,7 @@ func (s *Server) handleListChunks(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, map[string]any{"chunks": chunks})
 }
 
-// handleSearchKB 教师调试：对本人知识库做向量检索，返回可核验引用。
+// handleSearchKB 教师调试：对本人知识库检索（vector/fulltext/hybrid，默认 hybrid）。
 func (s *Server) handleSearchKB(w http.ResponseWriter, r *http.Request) {
 	current := auth.UserFromContext(r.Context())
 	kbID, ok := pathID(r, "id")
@@ -207,22 +209,24 @@ func (s *Server) handleSearchKB(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "知识库 ID 非法")
 		return
 	}
-	if !s.models.EmbeddingConfigured() {
-		api.WriteError(w, r, http.StatusConflict, "embedding_not_configured", "尚未配置 Embedding 上游，无法检索")
-		return
-	}
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	var req struct {
 		Question string `json:"question"`
 		TopK     int    `json:"top_k"`
+		Mode     string `json:"mode"`
 	}
 	if err := jsonDecode(r.Body, &req); err != nil {
 		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "请求体必须是 JSON")
 		return
 	}
+	// 纯全文检索不依赖 Embedding 上游；其余模式需可用 Embedding（hybrid 会降级）。
+	if !s.models.EmbeddingConfigured() && req.Mode != kb.ModeFullText {
+		api.WriteError(w, r, http.StatusConflict, "embedding_not_configured", "尚未配置 Embedding 上游，无法检索")
+		return
+	}
 
 	candidates, err := s.kb.Search(r.Context(), current.ID, current.Role == auth.RoleAdmin, kbID,
-		kb.SearchRequest{Question: req.Question, TopK: req.TopK},
+		kb.SearchRequest{Question: req.Question, TopK: req.TopK, Mode: req.Mode},
 		s.models.Embedding(), s.models.EmbeddingModelName())
 	if err != nil {
 		s.writeKBError(w, r, err)
@@ -233,4 +237,20 @@ func (s *Server) handleSearchKB(w http.ResponseWriter, r *http.Request) {
 		"model":      s.models.EmbeddingModelName(),
 		"count":      len(candidates),
 	})
+}
+
+// handleReindexKB 按当前中文分词器重建知识库全文索引（不重新向量化）。
+func (s *Server) handleReindexKB(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	kbID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "知识库 ID 非法")
+		return
+	}
+	n, err := s.kb.ReindexFullText(r.Context(), current.ID, current.Role == auth.RoleAdmin, kbID)
+	if err != nil {
+		s.writeKBError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"reindexed_chunks": n})
 }

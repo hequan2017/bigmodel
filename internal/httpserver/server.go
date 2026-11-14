@@ -71,6 +71,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/kb/{id}/documents/{docID}/retry", s.requireAuth(s.requireRole(s.handleRetryDocument, kbRoles...)))
 	mux.HandleFunc("GET /api/kb/{id}/documents/{docID}/chunks", s.requireAuth(s.requireRole(s.handleListChunks, kbRoles...)))
 	mux.HandleFunc("POST /api/kb/{id}/search", s.requireAuth(s.requireRole(s.handleSearchKB, kbRoles...)))
+	mux.HandleFunc("POST /api/kb/{id}/reindex", s.requireAuth(s.requireRole(s.handleReindexKB, kbRoles...)))
 
 	mux.HandleFunc("POST /api/apps", s.requireAuth(s.requireRole(s.handleCreateApp, kbRoles...)))
 	mux.HandleFunc("GET /api/apps", s.requireAuth(s.handleListApps))

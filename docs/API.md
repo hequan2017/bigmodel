@@ -42,7 +42,8 @@
 | DELETE | /api/kb/{id}/documents/{docID} | A,T | 停用文档（立即不可检索，幂等） |
 | POST | /api/kb/{id}/documents/{docID}/retry | A,T | 失败文档重新入队（仅 failed） |
 | GET | /api/kb/{id}/documents/{docID}/chunks | A,T | 文档片段（文本与 rune 偏移，不含向量） |
-| POST | /api/kb/{id}/search | A,T | 向量检索调试：问题 → 候选（含引用定位） |
+| POST | /api/kb/{id}/search | A,T | 检索调试：mode=vector/fulltext/hybrid（默认 hybrid，向量+全文 RRF 融合）；问题 → 候选（含引用定位） |
+| POST | /api/kb/{id}/reindex | A,T | 按当前中文分词器重建全文索引（不重新向量化，返回片段数） |
 
 ## 问答应用
 
