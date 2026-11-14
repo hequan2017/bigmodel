@@ -39,6 +39,7 @@ func (s *Service) StartAttempt(ctx context.Context, userID, examID int64) (*Stud
 	if err := s.pool.QueryRow(ctx, `SELECT now()`).Scan(&dbNow); err != nil {
 		return nil, fmt.Errorf("查询数据库时间: %w", err)
 	}
+	fmt.Printf("DEBUG 窗口: dbNow=%v open=%v close=%v\n", dbNow.Format(time.RFC3339Nano), openAt.Format(time.RFC3339Nano), closeAt.Format(time.RFC3339Nano))
 	if dbNow.Before(*openAt) {
 		return nil, ErrExamNotOpen
 	}

@@ -83,3 +83,18 @@ func connectWithConfig(ctx context.Context, poolCfg *pgxpool.Config) (*pgxpool.P
 	}
 	return pool, nil
 }
+
+// EnsureVectorExtension 在默认 schema（public）安装 pgvector 扩展。
+// 测试 schema 隔离场景下调用：扩展是库级对象，装在 public 后
+// 各测试 schema 通过 search_path 解析即可共享，无需每 schema 重复安装。
+func EnsureVectorExtension(ctx context.Context, cfg config.Config) error {
+	pool, err := Connect(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	if _, err := pool.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS vector`); err != nil {
+		return fmt.Errorf("安装 pgvector 扩展: %w", err)
+	}
+	return nil
+}

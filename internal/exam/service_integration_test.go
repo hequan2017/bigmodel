@@ -23,10 +23,13 @@ func newTestService(t *testing.T) (*Service, *pgxpool.Pool) {
 	ctx := context.Background()
 	h := fnv32(t.Name())
 	schema := fmt.Sprintf("itest_exam_%x_%d", h, time.Now().UnixNano())
+	if err := database.EnsureVectorExtension(ctx, cfg); err != nil {
+		t.Skipf("安装 pgvector 扩展失败: %v", err)
+	}
 	if err := database.EnsureSchema(ctx, cfg, schema); err != nil {
 		t.Skipf("创建测试 schema 失败: %v", err)
 	}
-	migPool, err := database.ConnectWithSchema(ctx, cfg, schema, false)
+	migPool, err := database.ConnectWithSchema(ctx, cfg, schema, true)
 	if err != nil {
 		_ = database.DropSchema(ctx, cfg, schema)
 		t.Skipf("连接迁移 schema 失败: %v", err)

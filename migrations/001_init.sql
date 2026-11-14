@@ -1,6 +1,7 @@
 -- 001：基础表结构 —— pgvector 扩展、用户与审计事件。
 -- 模型配置、知识库、文档、应用、考试等表由各自功能的后续迁移追加。
 
+-- pgvector 扩展安装到 public（默认 schema），全库共享同一实例。
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE users (
