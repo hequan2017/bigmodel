@@ -56,7 +56,7 @@
   <button data-tab="tab-exams">考试</button>
   <button data-tab="tab-kb">知识库</button>
   <button data-tab="tab-apps">问答应用</button>
-  <button data-tab="tab-models" id="modelsTabBtn" class="hidden">模型（管理员）</button>
+  <button data-tab="tab-models" id="modelsTabBtn" class="hidden">运维（管理员）</button>
 </nav>
 <main>
   <!-- 题库 -->
@@ -157,7 +157,9 @@
 
 学生问题: {{question}}</textarea></div>
       <button class="act" onclick="createApp()">创建草稿</button>
+      <button class="act gray" onclick="validatePrompt()">校验 Prompt</button>
       <span id="aMsg" class="err"></span>
+      <div id="pvResult" class="hidden"></div>
     </div>
     <div class="card"><h2>应用列表</h2>
       <table id="appTable"><thead><tr><th>ID</th><th>名称</th><th>状态</th><th>版本</th><th></th></tr></thead><tbody></tbody></table>
@@ -177,6 +179,11 @@
   <section id="tab-models" class="hidden">
     <div class="card"><h2>模型接入与连通性</h2>
       <div id="modelList"></div>
+    </div>
+    <div class="card"><h2>审计事件（最近 100 条）
+      <button class="act gray" onclick="loadAudit()">刷新</button></h2>
+      <table id="auditTable"><thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>资源</th><th>结果</th></tr></thead><tbody></tbody></table>
+      <div class="meta">基础留痕查看，不宣称防篡改审计；不记录口令/令牌/密钥。</div>
     </div>
   </section>
 </main>
@@ -513,6 +520,36 @@ async function debugRun() {
 }
 
 /* ---------- 模型 ---------- */
+async function validatePrompt() {
+  const pv = document.getElementById("pvResult");
+  pv.classList.remove("hidden");
+  try {
+    const d = await api("POST", "/api/prompt/validate",
+      { template: document.getElementById("aPrompt").value });
+    pv.className = d.valid ? "ok" : "err";
+    pv.textContent = d.valid
+      ? "模板合法，引用变量: " + (d.variables.length ? d.variables.join(", ") : "（无）")
+      : "模板不合法: " + d.error;
+  } catch (e) { pv.className = "err"; pv.textContent = e.message || "校验失败"; }
+}
+
+async function loadAudit() {
+  const tbody = document.querySelector("#auditTable tbody");
+  tbody.innerHTML = "";
+  try {
+    const d = await api("GET", "/api/admin/audit?limit=100");
+    for (const e of d.events) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${fmtTime(e.created_at)}</td><td>${e.actor_name || e.actor_id || "-"}</td>
+        <td>${e.action}</td><td>${e.resource_type}#${e.resource_id}</td>
+        <td>${e.result}</td>`;
+      tbody.appendChild(tr);
+    }
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="err">${e.message || "加载失败"}</td></tr>`;
+  }
+}
+
 async function loadModels() {
   if (!IS_ADMIN) return;
   const d = await api("GET", "/api/admin/models");
@@ -545,7 +582,7 @@ async function testModel(kind) {
 
 function fmtTime(s) { return new Date(s).toLocaleString("zh-CN", { hour12: false }); }
 
-loadQuestions(); loadExams(); loadKBs(); loadApps(); loadModels();
+loadQuestions(); loadExams(); loadKBs(); loadApps(); loadModels(); loadAudit();
 </script>
 </body>
 </html>

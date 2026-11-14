@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/hequan2017/bigmodel/internal/api"
 	"github.com/hequan2017/bigmodel/internal/audit"
@@ -435,4 +436,21 @@ func (s *Server) handleAvailableExams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"exams": exams})
+}
+
+// handleAdminAudit 管理员查看最近审计事件（§4.4 基础留痕查看）。
+func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
+	limit := 100
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	events, err := audit.ListEvents(r.Context(), s.pool, limit)
+	if err != nil {
+		s.log.Error("查询审计事件失败", "error", err)
+		api.WriteError(w, r, http.StatusInternalServerError, "internal_error", "查询审计事件失败")
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"events": events})
 }
