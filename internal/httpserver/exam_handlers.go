@@ -455,6 +455,22 @@ func (s *Server) handleAttemptDetail(w http.ResponseWriter, r *http.Request) {
 	api.WriteJSON(w, http.StatusOK, map[string]any{"detail": detail})
 }
 
+// handleExamStats 教师查看考试统计聚合（§16.1）。
+func (s *Server) handleExamStats(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	stats, err := s.exam.GetExamStats(r.Context(), current.ID, current.Role == auth.RoleAdmin, examID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"stats": stats})
+}
+
 // handleAdminAudit 管理员查看最近审计事件（§4.4 基础留痕查看）。
 func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
 	limit := 100

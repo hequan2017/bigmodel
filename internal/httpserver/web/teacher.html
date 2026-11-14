@@ -115,6 +115,10 @@
     <div class="card hidden" id="resultsBox">
       <h3>成绩列表：<span id="resultsExamTitle"></span></h3>
       <table id="rTable"><thead><tr><th>学生</th><th>状态</th><th>总分</th><th>提交时间</th><th>提交原因</th><th></th></tr></thead><tbody></tbody></table>
+      <button class="act" onclick="showStats()">答题统计</button>
+      <div id="statsBox" class="hidden" style="margin-top:14px"><div id="statsSummary" class="meta"></div>
+        <table id="statsTable"><thead><tr><th>题号</th><th>题干</th><th>作答人数</th><th>答对</th><th>答错</th><th>错误率</th></tr></thead><tbody></tbody></table>
+      </div>
       <div id="detailBox" class="hidden" style="margin-top:14px"><h3>作答详情</h3><div id="detailBody"></div></div>
     </div>
   </section>
@@ -530,6 +534,29 @@ async function debugRun() {
 }
 
 /* ---------- 作答详情与文档片段 ---------- */
+async function showStats() {
+  const box = document.getElementById("statsBox");
+  box.classList.remove("hidden");
+  try {
+    const d = await api("GET", `/api/exam/exams/${window.currentResultsExam}/stats`);
+    const st = d.stats;
+    document.getElementById("statsSummary").textContent =
+      `已提交 ${st.submitted_attempts} 人 · 作答中 ${st.in_progress_attempts} 人 · 平均 ${st.avg_score.toFixed(1)} 分 · 最高 ${st.max_score} · 最低 ${st.min_score}`;
+    const tbody = document.querySelector("#statsTable tbody");
+    tbody.innerHTML = "";
+    for (const it of st.items) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${it.order_no}</td><td>${it.stem}</td><td>${it.attempted}</td>
+        <td><span class="badge ok">${it.correct}</span></td>
+        <td><span class="badge err">${it.wrong}</span></td>
+        <td>${it.error_rate.toFixed(0)}%</td>`;
+      tbody.appendChild(tr);
+    }
+  } catch (e) {
+    document.getElementById("statsSummary").textContent = e.message || "统计加载失败";
+  }
+}
+
 async function showDetail(attemptId) {
   const box = document.getElementById("detailBox");
   const body = document.getElementById("detailBody");
