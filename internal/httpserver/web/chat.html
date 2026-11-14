@@ -58,7 +58,11 @@ const ROLE = sessionStorage.getItem("role");
 document.getElementById("whoami").textContent = sessionStorage.getItem("name") || "";
 if (!TOKEN || ROLE !== "student") location.href = "/";
 
-function logout() { sessionStorage.clear(); location.href = "/"; }
+function logout() {
+  try { fetch("/api/auth/logout", { method: "POST", headers: headers() }).catch(() => {}); } catch (e) {}
+  sessionStorage.clear();
+  location.href = "/";
+}
 function headers() { return { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" }; }
 async function api(method, path) {
   const r = await fetch(path, { headers: headers() });

@@ -207,7 +207,12 @@ document.getElementById("roleBadge").textContent = ROLE === "admin" ? " · 管�
 if (!TOKEN || (ROLE !== "teacher" && ROLE !== "admin")) location.href = "/";
 if (IS_ADMIN) document.getElementById("modelsTabBtn").classList.remove("hidden");
 
-function logout() { sessionStorage.clear(); location.href = "/"; }
+function logout() {
+  // 先通知服务端失效会话（尽力而为），再清理本地。
+  try { fetch("/api/auth/logout", { method: "POST", headers: headers() }).catch(() => {}); } catch (e) {}
+  sessionStorage.clear();
+  location.href = "/";
+}
 function headers() { return { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" }; }
 
 async function api(method, path, body) {
@@ -240,6 +245,7 @@ async function createQuestion() {
   const msg = document.getElementById("qMsg");
   msg.textContent = "";
   const type = document.getElementById("qType").value;
+  const editing = window.editingQuestionId;
   const body = {
     type, stem: document.getElementById("qStem").value,
     correct_answer: type === "single" ? document.getElementById("qAnswer").value
@@ -252,10 +258,40 @@ async function createQuestion() {
     body.options = ["A", "B", "C", "D"].map((k) => ({ key: k, text: document.getElementById("opt" + k).value }));
   }
   try {
-    await api("POST", "/api/exam/questions", body);
-    msg.className = "ok"; msg.textContent = "创建成功";
+    if (editing) {
+      await api("PUT", "/api/exam/questions/" + editing, body);
+      msg.className = "ok"; msg.textContent = "修改成功";
+    } else {
+      await api("POST", "/api/exam/questions", body);
+      msg.className = "ok"; msg.textContent = "创建成功";
+    }
+    window.editingQuestionId = null;
+    document.querySelector("#tab-questions h2").textContent = "新建题目";
     loadQuestions();
   } catch (e) { msg.className = "err"; msg.textContent = e.message; }
+}
+
+function editQuestion(id) {
+  const q = (window.questionCache || []).find((x) => x.id === id);
+  if (!q) return;
+  window.editingQuestionId = id;
+  document.querySelector("#tab-questions h2").textContent = "编辑题目 #" + id;
+  document.getElementById("qType").value = q.type;
+  qTypeChanged();
+  document.getElementById("qStem").value = q.stem;
+  if (q.type === "single") {
+    for (const o of (q.options || [])) {
+      const el = document.getElementById("opt" + o.key);
+      if (el) el.value = o.text;
+    }
+    document.getElementById("qAnswer").value = q.correct_answer;
+  } else {
+    document.getElementById("qJudgeAnswer").value = q.correct_answer;
+  }
+  document.getElementById("qScore").value = q.default_score;
+  document.getElementById("qLevel").value = q.level_code || "";
+  document.getElementById("qTags").value = (q.tags || []).join(",");
+  document.getElementById("qStem").scrollIntoView({ behavior: "smooth" });
 }
 
 async function loadQuestions() {
@@ -269,7 +305,8 @@ async function loadQuestions() {
       <td>${q.stem}</td><td>${q.correct_answer}</td><td>${q.default_score}</td>
       <td>${q.level_code || "-"}</td>
       <td><span class="badge ${q.status === "active" ? "ok" : "err"}">${q.status}</span></td>
-      <td>${q.status === "active" ? `<button class="act red" onclick="disableQuestion(${q.id})">停用</button>` : ""}</td>`;
+      <td>${q.status === "active" ? `<button class="act gray" onclick="editQuestion(${q.id})">编辑</button>
+        <button class="act red" onclick="disableQuestion(${q.id})">停用</button>` : ""}</td>`;
     tbody.appendChild(tr);
   }
 }
@@ -414,14 +451,21 @@ async function loadKBs() {
         const badge = doc.status === "ready" ? '<span class="badge ok">ready</span>'
           : doc.status === "failed" ? `<span class="badge err">failed: ${doc.failure_reason || ""}</span>`
           : `<span class="badge warn">${doc.status}</span>`;
+        const retryBtn = doc.status === "failed"
+          ? `<button class="act" onclick="retryDoc(${k.id}, ${doc.id})">重试</button>` : "";
         row.innerHTML = `<span style="min-width:200px">${doc.display_name}</span> ${badge}
           <span class="meta">${doc.char_count} 字符 · 重试 ${doc.retry_count} 次</span>
           <button class="act gray" onclick="showChunks(${k.id}, ${doc.id}, this)">片段</button>
+          ${retryBtn}
           <button class="act red" onclick="disableDoc(${k.id}, ${doc.id})">停用</button>`;
         docs.appendChild(row);
       }
     });
   }
+}
+async function retryDoc(kbId, docId) {
+  try { await api("POST", `/api/kb/${kbId}/documents/${docId}/retry`); loadKBs(); }
+  catch (e) { alert(e.message); }
 }
 async function disableDoc(kbId, docId) {
   try { await api("DELETE", `/api/kb/${kbId}/documents/${docId}`); loadKBs(); } catch (e) { alert(e.message); }
