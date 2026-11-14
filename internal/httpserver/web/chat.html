@@ -41,7 +41,8 @@
   <div class="card">
     <div class="row">
       <label class="meta">选择问答应用</label>
-      <select id="appSel" style="flex:1"></select>
+      <select id="appSel" style="flex:1" onchange="onAppChange()"></select>
+      <button class="act" style="background:#6b7280" onclick="newConversation()">新会话</button>
     </div>
     <div id="chat"></div>
     <div class="row" style="margin-top:12px">
@@ -69,6 +70,23 @@ async function api(method, path) {
 
 let conversationId = "";
 let apps = [];
+
+// 会话按应用持久化：刷新页面后继续同一会话上下文。
+function convKey() { return "conv_" + document.getElementById("appSel").value; }
+function onAppChange() {
+  conversationId = sessionStorage.getItem(convKey()) || "";
+  document.getElementById("chat").innerHTML = "";
+  const name = document.getElementById("appSel").selectedOptions[0];
+  document.getElementById("chatMsg").textContent =
+    name ? `当前应用：${name.textContent}` + (conversationId ? " · 已恢复历史会话" : " · 新会话")
+         : "";
+}
+function newConversation() {
+  conversationId = "";
+  sessionStorage.removeItem(convKey());
+  document.getElementById("chat").innerHTML = "";
+  document.getElementById("chatMsg").textContent = "已开启新会话";
+}
 
 async function loadApps() {
   const d = await api("GET", "/api/apps");
@@ -131,7 +149,10 @@ async function ask() {
     const dec = new TextDecoder();
     let buf = "", type = null, data = "", first = true;
     const handle = (t, payload) => {
-      if (t === "start") conversationId = payload.conversation_id || conversationId;
+      if (t === "start") {
+        conversationId = payload.conversation_id || conversationId;
+        sessionStorage.setItem(convKey(), conversationId);
+      }
       else if (t === "delta") { if (first) { out.textContent = ""; first = false; } out.textContent += payload.text;
         document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight; }
       else if (t === "references") addRefs(payload.references || []);
@@ -157,7 +178,7 @@ async function ask() {
   }
 }
 
-loadApps();
+loadApps().then(onAppChange);
 </script>
 </body>
 </html>

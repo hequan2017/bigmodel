@@ -157,8 +157,14 @@
 {{context}}
 
 学生问题: {{question}}</textarea></div>
-      <button class="act" onclick="createApp()">创建草稿</button>
-      <button class="act gray" onclick="validatePrompt()">校验 Prompt</button>
+      <div class="row">
+        <button class="act" onclick="createApp()">创建草稿</button>
+        <button class="act gray" onclick="validatePrompt()">校验 Prompt</button>
+        <span class="meta">插入变量：</span>
+        <button class="act gray" onclick="insertVar('question')">{{question}}</button>
+        <button class="act gray" onclick="insertVar('context')">{{context}}</button>
+        <button class="act gray" onclick="insertVar('history')">{{history}}</button>
+      </div>
       <span id="aMsg" class="err"></span>
       <div id="pvResult" class="hidden"></div>
     </div>
@@ -560,6 +566,15 @@ async function showChunks(kbId, docId, btn) {
 }
 
 /* ---------- 模型 ---------- */
+function insertVar(name) {
+  const box = document.getElementById("aPrompt");
+  const tag = "{{" + name + "}}";
+  const start = box.selectionStart ?? box.value.length;
+  box.value = box.value.slice(0, start) + tag + box.value.slice(box.selectionEnd ?? box.value.length);
+  box.focus();
+  validatePrompt();
+}
+
 async function validatePrompt() {
   const pv = document.getElementById("pvResult");
   pv.classList.remove("hidden");
