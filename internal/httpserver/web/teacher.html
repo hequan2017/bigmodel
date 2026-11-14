@@ -84,6 +84,13 @@
       <button class="act" onclick="createQuestion()">创建题目</button>
       <span id="qMsg" class="err"></span>
     </div>
+    <div class="card">
+      <h2>批量导入题目（粘贴 JSON 数组，字段与单题创建一致）</h2>
+      <div class="row"><textarea id="bulkJson" placeholder='[{"type":"single","stem":"题干","options":[{"key":"A","text":"选项A"},{"key":"B","text":"选项B"}],"correct_answer":"A","default_score":5},{"type":"judge","stem":"判断题干","correct_answer":"true","default_score":3}]' style="min-height:90px"></textarea></div>
+      <div class="row"><button class="act" onclick="bulkImport()">批量导入</button>
+      <span class="meta">逐条校验导入；失败条目会逐条列出原因，不影响已成功条目。</span></div>
+      <div id="bulkMsg" class="err"></div>
+    </div>
     <div class="card"><h2>题目列表</h2>
       <table id="qTable"><thead><tr><th>ID</th><th>题型</th><th>题干</th><th>答案</th><th>分值</th><th>等级</th><th>状态</th><th></th></tr></thead><tbody></tbody></table>
     </div>
@@ -309,6 +316,43 @@ function editQuestion(id) {
   document.getElementById("qLevel").value = q.level_code || "";
   document.getElementById("qTags").value = (q.tags || []).join(",");
   document.getElementById("qStem").scrollIntoView({ behavior: "smooth" });
+}
+
+async function bulkImport() {
+  const msg = document.getElementById("bulkMsg");
+  msg.textContent = "";
+  let list;
+  try {
+    list = JSON.parse(document.getElementById("bulkJson").value);
+  } catch (e) {
+    msg.className = "err";
+    msg.textContent = "JSON 解析失败: " + e.message;
+    return;
+  }
+  if (!Array.isArray(list) || list.length === 0) {
+    msg.className = "err"; msg.textContent = "需要非空的题目数组"; return;
+  }
+  if (list.length > 100) {
+    msg.className = "err"; msg.textContent = "单次最多导入 100 条"; return;
+  }
+  let ok = 0;
+  const failures = [];
+  for (let i = 0; i < list.length; i++) {
+    try {
+      await api("POST", "/api/exam/questions", list[i]);
+      ok++;
+    } catch (e) {
+      failures.push(`第 ${i + 1} 条: ${e.message || "失败"}`);
+    }
+  }
+  loadQuestions();
+  if (failures.length === 0) {
+    msg.className = "ok";
+    msg.textContent = `导入完成：成功 ${ok} 条`;
+  } else {
+    msg.className = "err";
+    msg.textContent = `导入完成：成功 ${ok} 条，失败 ${failures.length} 条\n` + failures.join("\n");
+  }
 }
 
 async function loadQuestions() {

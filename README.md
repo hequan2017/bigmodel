@@ -164,6 +164,20 @@ curl http://127.0.0.1:18090/readyz
 共享存储或对象存储（§6.2/§16.2）。当前镜像与 compose 为单实例部署形态。
 数据库状态（题目快照、作答、判分、向量）全部在 PostgreSQL，天然多副本共享。
 
+## 运维：备份与恢复（§16.4）
+
+```bash
+# 备份（建议每日定时；数据库 + 文档原始文件需同时备份）
+docker compose exec db pg_dump -U bigmodel -d bigmodel > backup_$(date +%F).sql
+tar czf data_$(date +%F).tgz data/          # 宿主机部署时；容器部署备份 app_data 卷
+
+# 恢复（先启动空库再导入，随后校验 readyz 与一次真实检索/登录）
+cat backup_2026-11-14.sql | docker compose exec -T db psql -U bigmodel -d bigmodel
+```
+
+恢复演练要求：在隔离环境完成"备份 → 恢复 → readyz/登录/检索抽查"全流程
+并记录可接受的数据丢失窗口（RPO）与恢复时间（RTO），不能只备份不演练。
+
 ## 当前进度（P0）
 
 - [x] ① 项目骨架 / 配置加载 / 数据库迁移 / 健康检查
