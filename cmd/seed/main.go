@@ -168,6 +168,8 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, cfg config.Config) error 
 	kbSvc := kb.NewService(pool, cfg.DataDir)
 	kbRow, err := kbSvc.CreateKB(ctx, teacherID, "AI 教学演示库", "内置演示教学资料，供问答与检索演示")
 	if errors.Is(err, kb.ErrDuplicateName) {
+		// 已存在：查回既有知识库 ID。
+		kbRow = &kb.KB{}
 		if err := pool.QueryRow(ctx,
 			`SELECT id FROM knowledge_bases WHERE owner_id = $1 AND name = $2`,
 			teacherID, "AI 教学演示库").Scan(&kbRow.ID); err != nil {

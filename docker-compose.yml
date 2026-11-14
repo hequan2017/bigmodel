@@ -16,5 +16,32 @@ services:
       timeout: 3s
       retries: 20
 
+  app:
+    build:
+      context: .
+      # Docker Hub 不可达时切换镜像源：
+      # args:
+      #   GO_IMAGE: docker.m.daocloud.io/library/golang:1.27-alpine
+    container_name: bigmodel-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_HTTP_ADDR: ":8080"
+      APP_DATA_DIR: /data
+      DATABASE_URL: postgres://bigmodel:bigmodel@db:5432/bigmodel?sslmode=disable
+      APP_CHAT_BASE_URL: ${APP_CHAT_BASE_URL:-}
+      APP_CHAT_API_KEY: ${APP_CHAT_API_KEY:-}
+      APP_CHAT_MODEL: ${APP_CHAT_MODEL:-}
+      APP_EMBEDDING_BASE_URL: ${APP_EMBEDDING_BASE_URL:-}
+      APP_EMBEDDING_API_KEY: ${APP_EMBEDDING_API_KEY:-}
+      APP_EMBEDDING_MODEL: ${APP_EMBEDDING_MODEL:-}
+    ports:
+      - "18090:8080"
+    volumes:
+      - app_data:/data
+    restart: unless-stopped
+
 volumes:
   db_data:
+  app_data:

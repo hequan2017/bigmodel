@@ -127,6 +127,30 @@ p99 ≤ 101ms；继续扩大规模前应叠加：多副本部署（§16.2）、�
 
 全部演示内容为原创编写；文档与题目按内容哈希/题干幂等去重，重复执行安全。
 
+## 部署（§16.2）
+
+```bash
+# 构建应用镜像（Docker Hub 不可达时加 --build-arg GO_IMAGE=docker.m.daocloud.io/library/golang:1.27-alpine）
+docker compose build app
+
+# 启动应用（单实例；启动即自动迁移；compose 映射宿主 18090 → 容器 8080，
+# 可按需调整，注意本机若已有服务占用 8080 需避开）
+docker compose up -d app
+
+# 初始化账号与演示数据（应用启动后执行）
+docker compose exec app /app/seed
+
+curl http://127.0.0.1:18090/readyz
+```
+
+模型服务通过环境变量注入（APP_CHAT_* / APP_EMBEDDING_*），可在
+`docker compose up` 前于 shell 或 .env 中设置。
+
+**多副本限制（如实说明）**：文档原始文件保存在本地卷 /data，多副本部署时
+"领取任务的副本写文件、其他副本读不到"——扩展到多副本前必须先把本地卷替换为
+共享存储或对象存储（§6.2/§16.2）。当前镜像与 compose 为单实例部署形态。
+数据库状态（题目快照、作答、判分、向量）全部在 PostgreSQL，天然多副本共享。
+
 ## 当前进度（P0）
 
 - [x] ① 项目骨架 / 配置加载 / 数据库迁移 / 健康检查
