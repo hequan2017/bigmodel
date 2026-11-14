@@ -309,3 +309,39 @@ func (s *Service) ListChunks(ctx context.Context, userID int64, isAdmin bool, kb
 	}
 	return out, rows.Err()
 }
+
+// ChunksForDoc 返回文档片段（文本与定位），不做用户级校验——
+// 供已发布问答应用展示引用原文使用：授权由"应用已发布"建立（§4.3），
+// 调用方必须先确认应用已发布且文档属于该应用绑定的知识库。
+func (s *Service) ChunksForDoc(ctx context.Context, kbID, docID int64) ([]ChunkView, error) {
+	var exists bool
+	if err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM documents d
+			JOIN knowledge_bases k ON k.id = d.knowledge_base_id
+			WHERE d.id = $1 AND d.knowledge_base_id = $2 AND d.status = 'ready')`,
+		docID, kbID).Scan(&exists); err != nil {
+		return nil, fmt.Errorf("查询文档: %w", err)
+	}
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT chunk_index, content, start_offset, end_offset, heading
+		FROM document_chunks WHERE document_id = $1 ORDER BY chunk_index`, docID)
+	if err != nil {
+		return nil, fmt.Errorf("查询片段: %w", err)
+	}
+	defer rows.Close()
+
+	out := []ChunkView{}
+	for rows.Next() {
+		var v ChunkView
+		if err := rows.Scan(&v.Index, &v.Content, &v.StartOffset, &v.EndOffset, &v.Heading); err != nil {
+			return nil, fmt.Errorf("读取片段: %w", err)
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}

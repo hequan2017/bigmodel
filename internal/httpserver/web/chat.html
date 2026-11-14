@@ -128,12 +128,44 @@ function addMsg(role, text) {
   return div;
 }
 
-function addRefs(refs) {
+function addRefs(appId, refs) {
   const div = document.createElement("div");
   div.className = "refs";
-  div.textContent = "引用来源: " + (refs.length
-    ? refs.map((x) => `#${x.chunk_id} 《${x.title}》`).join("、")
-    : "（本次未检索到参考资料）");
+  if (!refs.length) {
+    div.textContent = "（本次未检索到参考资料）";
+  } else {
+    div.textContent = "引用来源（点击查看原文）: ";
+    for (const ref of refs) {
+      const b = document.createElement("button");
+      b.className = "act gray";
+      b.style.margin = "2px";
+      b.style.padding = "2px 6px";
+      b.textContent = `《${ref.title}》`;
+      b.onclick = async () => {
+        try {
+          const d = await api("GET",
+            `/api/apps/${appId}/kb-documents/${ref.document_id}/chunks`);
+          const hit = d.chunks.find((c) =>
+            c.start_offset === ref.start_offset && c.end_offset === ref.end_offset)
+            || d.chunks[ref.chunk_index];
+          const box = document.createElement("div");
+          box.className = "msg assistant";
+          box.textContent = `【原文】《${ref.title}》 片段${hit ? hit.index : "?"}\n`
+            + (hit ? hit.content : "片段不存在（文档可能已更新）");
+          const chat2 = document.getElementById("chat");
+          chat2.appendChild(box);
+          chat2.scrollTop = chat2.scrollHeight;
+        } catch (e) {
+          const box = document.createElement("div");
+          box.className = "refs";
+          box.textContent = "原文加载失败: " + (e.message || "未知错误");
+          const chat2 = document.getElementById("chat");
+          chat2.appendChild(box);
+        }
+      };
+      div.appendChild(b);
+    }
+  }
   const chat = document.getElementById("chat");
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
@@ -168,7 +200,7 @@ async function ask() {
       }
       else if (t === "delta") { if (first) { out.textContent = ""; first = false; } out.textContent += payload.text;
         document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight; }
-      else if (t === "references") addRefs(payload.references || []);
+      else if (t === "references") addRefs(parseInt(document.getElementById("appSel").value, 10), payload.references || []);
       else if (t === "error") out.textContent += "\n[错误] " + payload.code + ": " + payload.message;
     };
     for (;;) {

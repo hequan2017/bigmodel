@@ -683,3 +683,36 @@ func (s *Service) ListMessages(ctx context.Context, userID, appID int64, convers
 	}
 	return out, rows.Err()
 }
+
+// ReferenceChunks 供学生/教师查看问答引用的片段原文：
+// 仅已发布应用（学生）或本人/管理员应用可查，且文档必须属于应用绑定的知识库。
+func (s *Service) ReferenceChunks(ctx context.Context, userID int64, role string, isAdmin bool,
+	appID, docID int64) ([]kb.ChunkView, error) {
+	a, err := s.getAppRow(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	if role == "student" {
+		if a.Status != StatusPublished || a.PublishedConfig == nil {
+			return nil, ErrNotFound
+		}
+	} else if !isAdmin && a.OwnerID != userID {
+		return nil, ErrNotFound
+	}
+	var kbID int64
+	if a.PublishedConfig != nil && role == "student" {
+		kbID = a.PublishedConfig.KnowledgeBaseID
+	} else if a.DraftConfig != nil {
+		kbID = a.DraftConfig.KnowledgeBaseID
+	} else {
+		return nil, ErrNotFound
+	}
+	chunks, err := s.kb.ChunksForDoc(ctx, kbID, docID)
+	if err != nil {
+		if errors.Is(err, kb.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return chunks, nil
+}

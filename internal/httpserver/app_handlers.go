@@ -284,3 +284,21 @@ func (s *Server) handleAppMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"messages": messages})
 }
+
+// handleReferenceChunks 学生/教师查看问答引用的片段原文（§7.3 引用可回溯）。
+func (s *Server) handleReferenceChunks(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	appID, ok1 := pathID(r, "id")
+	docID, ok2 := pathID(r, "docID")
+	if !ok1 || !ok2 {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "ID 非法")
+		return
+	}
+	chunks, err := s.apps.ReferenceChunks(r.Context(), current.ID, current.Role,
+		current.Role == auth.RoleAdmin, appID, docID)
+	if err != nil {
+		s.writeAppError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"chunks": chunks})
+}
