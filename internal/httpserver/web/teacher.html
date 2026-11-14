@@ -193,6 +193,7 @@
       <div class="row">
         <input id="debugQ" placeholder="输入调试问题" style="flex:1">
         <button class="act" onclick="debugRun()">运行</button>
+        <label class="meta"><input type="checkbox" id="debugPublished"> 按发布配置运行（验证学生实际行为）</label>
       </div>
       <div id="debugAnswer" style="min-height:40px;white-space:pre-wrap;font-size:14px"></div>
       <pre id="debugRefs" class="refs hidden"></pre>
@@ -641,6 +642,7 @@ async function showRuns(appId, name) {
 async function openDebug(id) {
   const a = (window.appCache || []).find((x) => x.id === id);
   document.getElementById("debugAppName").textContent = `#${a.id} ${a.name}`;
+  document.getElementById("debugPublished").checked = false;
   document.getElementById("debugAnswer").textContent = "";
   const refs = document.getElementById("debugRefs");
   refs.classList.add("hidden"); refs.textContent = "";
@@ -658,7 +660,8 @@ async function debugRun() {
   out.textContent = "（生成中...）";
   try {
     const r = await fetch(`/api/apps/${window.debugAppId}/run`, {
-      method: "POST", headers: headers(), body: JSON.stringify({ question: q }) });
+      method: "POST", headers: headers(),
+      body: JSON.stringify({ question: q, use_published: document.getElementById("debugPublished").checked }) });
     const reader = r.body.getReader();
     const dec = new TextDecoder();
     let buf = "", type = null, data = "";

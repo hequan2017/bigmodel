@@ -364,7 +364,7 @@ func toApp(a *appRow, role string) *App {
 
 // getRunnable 返回可运行的应用与配置：
 // 学生只能运行已发布应用（使用发布快照）；教师/管理员运行本人应用按草稿调试（§8.4）。
-func (s *Service) getRunnable(ctx context.Context, userID int64, role string, isAdmin bool, appID int64) (*appRow, AppConfig, int, string, error) {
+func (s *Service) getRunnable(ctx context.Context, userID int64, role string, isAdmin bool, appID int64, forcePublished bool) (*appRow, AppConfig, int, string, error) {
 	a, err := s.getAppRow(ctx, appID)
 	if err != nil {
 		return nil, AppConfig{}, 0, "", err
@@ -381,6 +381,14 @@ func (s *Service) getRunnable(ctx context.Context, userID int64, role string, is
 	if a.Status == StatusDisabled {
 		return nil, AppConfig{}, 0, "", ErrNotRunnable
 	}
+	// 教师/管理员：默认按草稿调试；勾选"按发布配置"时验证学生实际行为。
+	// 从未发布过（无快照）→ 404：不存在可验证的发布行为。
+	if forcePublished {
+		if a.Status != StatusPublished || a.PublishedConfig == nil {
+			return nil, AppConfig{}, 0, "", ErrNotFound
+		}
+		return a, *a.PublishedConfig, a.PublishedRevision, ModePublished, nil
+	}
 	if a.DraftConfig == nil {
 		return nil, AppConfig{}, 0, "", invalidConfig("草稿配置缺失")
 	}
@@ -391,7 +399,7 @@ func (s *Service) getRunnable(ctx context.Context, userID int64, role string, is
 // 上游错误映射为稳定错误码；客户端断开或取消标记 canceled，
 // 部分输出不写入会话历史。
 func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) error) error {
-	_, cfg, revision, mode, err := s.getRunnable(ctx, p.UserID, p.Role, p.IsAdmin, p.AppID)
+	_, cfg, revision, mode, err := s.getRunnable(ctx, p.UserID, p.Role, p.IsAdmin, p.AppID, p.UsePublished)
 	if err != nil {
 		return err
 	}

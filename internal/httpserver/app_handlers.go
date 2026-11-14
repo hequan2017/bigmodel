@@ -231,6 +231,7 @@ func (s *Server) handleRunApp(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Question       string `json:"question"`
 		ConversationID string `json:"conversation_id"`
+		UsePublished   bool   `json:"use_published"`
 	}
 	if err := jsonDecode(r.Body, &req); err != nil {
 		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "请求体必须是 JSON")
@@ -253,7 +254,9 @@ func (s *Server) handleRunApp(w http.ResponseWriter, r *http.Request) {
 	err := s.apps.RunApp(r.Context(), app.RunParams{
 		UserID:         current.ID,
 		Role:           current.Role,
+		IsAdmin:        current.Role == auth.RoleAdmin,
 		AppID:          appID,
+		UsePublished:   req.UsePublished,
 		Question:       req.Question,
 		ConversationID: req.ConversationID,
 		Chat:           s.models.Chat(),

@@ -84,10 +84,12 @@ type HistoryMessage struct {
 
 // RunParams 是一次运行的输入。
 type RunParams struct {
-	UserID         int64
-	Role           string
-	IsAdmin        bool
-	AppID          int64
+	UserID  int64
+	Role    string
+	IsAdmin bool
+	AppID   int64
+	// UsePublished: 教师/管理员调试时按发布快照运行（默认按草稿）。
+	UsePublished   bool
 	Question       string
 	ConversationID string
 	Chat           model.ChatClient

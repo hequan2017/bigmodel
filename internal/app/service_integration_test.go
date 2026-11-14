@@ -447,3 +447,89 @@ func TestAppRunFailureAndCancelIntegration(t *testing.T) {
 		t.Errorf("取消运行不应写入会话历史, got %d 条", msgCount)
 	}
 }
+
+func TestDebugPublishedModeIntegration(t *testing.T) {
+	svc, kbSvc, pool := newTestEnv(t)
+	ctx := context.Background()
+
+	suffix := "dp_" + t.Name()
+	teacherID := createAppTestUser(t, pool, "itest_dp_t_"+suffix)
+	embed := &fakeEmbedder{dim: 4}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO model_profiles (name, kind, model_name, base_url, credential_ref)
+		VALUES ($1, 'embedding', 'itest-model', 'http://127.0.0.1:1', 'ITEST')`,
+		"itest-dp-emb-"+suffix); err != nil {
+		t.Fatalf("创建测试档案: %v", err)
+	}
+
+	kbRow, err := kbSvc.CreateKB(ctx, teacherID, "按发布调试测试库", "")
+	if err != nil {
+		t.Fatalf("创建知识库: %v", err)
+	}
+	seedReadyDoc(t, kbSvc, kbRow.ID, teacherID, embed)
+
+	a, err := svc.CreateDraft(ctx, teacherID, "按发布调试应用", AppConfig{
+		KnowledgeBaseID: kbRow.ID, Prompt: "草稿版 {{question}}", TopK: 5, HistoryTurns: 1})
+	if err != nil {
+		t.Fatalf("创建应用: %v", err)
+	}
+	if _, err := svc.Publish(ctx, teacherID, "teacher", false, a.ID); err != nil {
+		t.Fatalf("发布: %v", err)
+	}
+	// 修改草稿（与发布快照不同）
+	draftCfg := AppConfig{KnowledgeBaseID: kbRow.ID, Prompt: "改后的草稿 {{question}}", TopK: 5, HistoryTurns: 1}
+	if _, err := svc.UpdateDraft(ctx, teacherID, "teacher", false, a.ID, draftCfg); err != nil {
+		t.Fatalf("更新草稿: %v", err)
+	}
+
+	chat := &fakeChat{}
+	events := []Event{}
+	// 按发布快照运行（UsePublished=true）
+	if err := svc.RunApp(ctx, RunParams{
+		UserID: teacherID, Role: "teacher", IsAdmin: false, AppID: a.ID,
+		UsePublished: true, Question: "发布验证",
+		Chat: chat, ChatModel: "mock-chat", Embed: embed, EmbedModel: "fake-embed",
+	}, func(ev Event) error { events = append(events, ev); return nil }); err != nil {
+		t.Fatalf("按发布运行: %v", err)
+	}
+	startEv := events[0].Payload.(map[string]any)
+	if startEv["mode"] != ModePublished || startEv["revision"].(int) != 1 {
+		t.Errorf("按发布运行 mode/revision 错误: %+v", startEv)
+	}
+	if strings.Contains(chat.lastPrompt, "改后的草稿") {
+		t.Error("按发布运行不应使用草稿 Prompt")
+	}
+
+	// 按草稿调试（UsePublished=false）
+	events = nil
+	chat2 := &fakeChat{}
+	if err := svc.RunApp(ctx, RunParams{
+		UserID: teacherID, Role: "teacher", IsAdmin: false, AppID: a.ID,
+		UsePublished: false, Question: "草稿验证",
+		Chat: chat2, ChatModel: "mock-chat", Embed: embed, EmbedModel: "fake-embed",
+	}, func(ev Event) error { events = append(events, ev); return nil }); err != nil {
+		t.Fatalf("按草稿运行: %v", err)
+	}
+	startEv2 := events[0].Payload.(map[string]any)
+	if startEv2["mode"] != ModeDebug {
+		t.Errorf("按草稿运行 mode 错误: %+v", startEv2)
+	}
+	if !strings.Contains(chat2.lastPrompt, "改后的草稿") {
+		t.Errorf("按草稿运行应使用草稿 Prompt: %q", chat2.lastPrompt)
+	}
+
+	// 从未发布的草稿应用强制按发布运行 → published_config 为空 → 404
+	draft, err := svc.CreateDraft(ctx, teacherID, "未发布应用 "+suffix, AppConfig{
+		KnowledgeBaseID: kbRow.ID, Prompt: "{{question}}", TopK: 5, HistoryTurns: 1})
+	if err != nil {
+		t.Fatalf("创建未发布应用: %v", err)
+	}
+	if err := svc.RunApp(ctx, RunParams{
+		UserID: teacherID, Role: "teacher", IsAdmin: false, AppID: draft.ID,
+		UsePublished: true, Question: "x",
+		Chat: chat2, ChatModel: "mock-chat", Embed: embed, EmbedModel: "fake-embed",
+	}, func(Event) error { return nil }); !errors.Is(err, ErrNotFound) {
+		t.Errorf("无发布快照强制按发布应 404, got %v", err)
+	}
+}
