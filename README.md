@@ -212,6 +212,16 @@ healthy 状态。多副本反向代理配置示例见 `docs/deploy/nginx-example
 | 15 | 容量压测三档实测 | 20/100/300 人，数据见上文 |
 | 16 | 文档片段计数 | 教师端文档行显示片段数 |
 
+## 页面预览
+
+| 登录 | 学生考试端 |
+|---|---|
+| ![登录](docs/screenshots/login.png) | ![学生考试](docs/screenshots/student-exam.png) |
+| **学生作答（倒计时/题号导航）** | **学生问答（SSE/引用/历史）** |
+| ![作答](docs/screenshots/student-taking.png) | ![问答](docs/screenshots/student-chat.png) |
+| **教师工作台（题库/考试/知识库/应用/运维）** | |
+| ![教师端](docs/screenshots/teacher.png) | |
+
 ## 回归冒烟脚本
 
 ```bash
