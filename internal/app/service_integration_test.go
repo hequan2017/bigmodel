@@ -293,6 +293,22 @@ func TestAppLifecycleAndRunIntegration(t *testing.T) {
 		t.Errorf("第二轮 Prompt 未注入历史: %q", chat.lastPrompt)
 	}
 
+	// 会话历史查询：本人可查全部 4 条，他人不可见。
+	history, err := svc.ListMessages(ctx, studentID, a.ID, convID)
+	if err != nil || len(history) != 4 {
+		t.Fatalf("会话消息: len=%d err=%v", len(history), err)
+	}
+	if history[0].Role != "user" || history[0].Content != "第一个问题" {
+		t.Errorf("历史顺序错误: %+v", history[0])
+	}
+	if history[3].Role != "assistant" || history[3].Content != "你好，这是RAG回答" {
+		t.Errorf("最后一条应为本轮助手回答: %+v", history[3])
+	}
+	otherID := createStudent(t, pool, "itest_a_msg_other_"+suffix)
+	if histOther, err := svc.ListMessages(ctx, otherID, a.ID, convID); err != nil || len(histOther) != 0 {
+		t.Errorf("他人会话消息应为空: len=%d err=%v", len(histOther), err)
+	}
+
 	// 教师调试草稿：发布快照不受草稿修改影响。
 	draftCfg := goodCfg
 	draftCfg.Prompt = "调试版 {{question}}"

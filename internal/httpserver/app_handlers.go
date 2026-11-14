@@ -266,3 +266,21 @@ func (s *Server) handleRunApp(w http.ResponseWriter, r *http.Request) {
 		_ = writeSSE(w, flusher, "error", map[string]any{"code": code, "message": msg})
 	}
 }
+
+// handleAppMessages 学生查看本人某应用的会话历史消息。
+func (s *Server) handleAppMessages(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	appID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "应用 ID 非法")
+		return
+	}
+	convID := r.URL.Query().Get("conversation_id")
+	messages, err := s.apps.ListMessages(r.Context(), current.ID, appID, convID)
+	if err != nil {
+		s.log.Error("查询会话消息失败", "error", err)
+		api.WriteError(w, r, http.StatusInternalServerError, "internal_error", "查询会话消息失败")
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"messages": messages})
+}

@@ -73,13 +73,22 @@ let apps = [];
 
 // 会话按应用持久化：刷新页面后继续同一会话上下文。
 function convKey() { return "conv_" + document.getElementById("appSel").value; }
-function onAppChange() {
+async function onAppChange() {
   conversationId = sessionStorage.getItem(convKey()) || "";
   document.getElementById("chat").innerHTML = "";
   const name = document.getElementById("appSel").selectedOptions[0];
+  if (conversationId) {
+    // 刷新后从服务端还原会话记录（仅本人、仅本应用）。
+    try {
+      const d = await api("GET", `/api/apps/${document.getElementById("appSel").value}/messages?conversation_id=${encodeURIComponent(conversationId)}`);
+      for (const m of d.messages) addMsg(m.role === "user" ? "user" : "assistant", m.content);
+      document.getElementById("chatMsg").textContent =
+        name ? `当前应用：${name.textContent} · 已恢复历史会话（${d.messages.length} 条记录）` : "";
+      return;
+    } catch (e) { /* 历史加载失败不阻断使用 */ }
+  }
   document.getElementById("chatMsg").textContent =
-    name ? `当前应用：${name.textContent}` + (conversationId ? " · 已恢复历史会话" : " · 新会话")
-         : "";
+    name ? `当前应用：${name.textContent} · 新会话` : "";
 }
 function newConversation() {
   conversationId = "";

@@ -651,3 +651,35 @@ func (s *Service) loadHistory(ctx context.Context, appID, userID int64, conv str
 	}
 	return newestFirst
 }
+
+// MessageView 是学生可见的会话消息（仅本人、仅本应用）。
+type MessageView struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// ListMessages 返回本人某应用、指定会话的历史消息（按时间正序）。
+// 未提供会话 ID 或会话不属于本人时返回空列表，不泄露他人内容。
+func (s *Service) ListMessages(ctx context.Context, userID, appID int64, conversationID string) ([]MessageView, error) {
+	if strings.TrimSpace(conversationID) == "" {
+		return []MessageView{}, nil
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT role, content FROM app_messages
+		WHERE app_id = $1 AND user_id = $2 AND conversation_id = $3
+		ORDER BY id`, appID, userID, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("查询会话消息: %w", err)
+	}
+	defer rows.Close()
+
+	out := []MessageView{}
+	for rows.Next() {
+		var m MessageView
+		if err := rows.Scan(&m.Role, &m.Content); err != nil {
+			return nil, fmt.Errorf("读取会话消息: %w", err)
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
