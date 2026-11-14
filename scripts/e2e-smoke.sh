@@ -41,9 +41,14 @@ CODE=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X POST "$BASE/api/k
   -H "$AH_T" -F "file=@$DEMO_DOC;type=text/markdown")
 check "上传演示文档" "$CODE" "201"
 
-sleep 5
-STATUS=$(curl -s --noproxy '*' "$BASE/api/kb/$KB" -H "$AH_T" \
-  | jqpy '[d["documents"][0]["status"] for d in [d]][0] if d["documents"] else "none"')
+# 轮询等待 worker 完成（CI 机器较慢，固定短等待会误报）
+STATUS="none"
+for i in $(seq 1 15); do
+  STATUS=$(curl -s --noproxy '*' "$BASE/api/kb/$KB" -H "$AH_T" \
+    | jqpy '[d["documents"][0]["status"] for d in [d]][0] if d["documents"] else "none"')
+  [ "$STATUS" = "ready" ] && break
+  sleep 2
+done
 check "文档向量化 ready（worker）" "$STATUS" "ready"
 
 SEARCH=$(curl -s --noproxy '*' -X POST "$BASE/api/kb/$KB/search" -H "$AH_T" -H 'Content-Type: application/json' \
