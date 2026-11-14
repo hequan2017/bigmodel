@@ -57,6 +57,10 @@
 | DELETE | /api/apps/{id} | A,T | 停用（拒绝新运行） |
 | POST | /api/apps/{id}/run | 全部 | SSE 运行：start/references/delta/done/error |
 | GET | /api/apps/{id}/messages?conversation_id= | 全部 | 本人该会话的历史消息（正序） |
+| GET | /api/apps/{id}/conversations | 全部 | 本人会话列表（最近优先，含消息数/最后活跃时间） |
+| DELETE | /api/apps/{id}/conversations/{conversationID} | 全部 | 删除本人指定会话（级联消息，幂等） |
+| GET | /api/apps/{id}/runs | A,T | 运行记录列表（含 retrieval_stats 检索通道统计：每路候选数/耗时/降级原因） |
+| GET | /api/apps/{id}/kb-documents/{docID}/chunks | 全部 | 引用原文片段（学生仅限本人运行引用过的文档） |
 
 ## Prompt
 
