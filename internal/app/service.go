@@ -716,3 +716,56 @@ func (s *Service) ReferenceChunks(ctx context.Context, userID int64, role string
 	}
 	return chunks, nil
 }
+
+// RunRow 是教师侧运行记录（§9.3 运行记录查看；不含学生问题全文）。
+type RunRow struct {
+	ID         int64      `json:"id"`
+	LoginName  string     `json:"login_name"`
+	Mode       string     `json:"mode"`
+	Status     string     `json:"status"`
+	Revision   int        `json:"revision"`
+	DurationMs *int       `json:"duration_ms,omitempty"`
+	ErrorCode  string     `json:"error_code,omitempty"`
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+}
+
+// ListRuns 返回本人应用（管理员全量）的最近运行记录。
+func (s *Service) ListRuns(ctx context.Context, userID int64, isAdmin bool, appID int64, limit int) ([]RunRow, error) {
+	a, err := s.getAppRow(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	if !isAdmin && a.OwnerID != userID {
+		return nil, ErrNotFound
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	rows, err := s.pool.Query(ctx, `
+		SELECT r.id, u.login_name, r.mode, r.status, r.revision,
+		       r.duration_ms, COALESCE(r.error_code, ''), r.started_at, r.finished_at
+		FROM app_runs r JOIN users u ON u.id = r.user_id
+		WHERE r.app_id = $1
+		ORDER BY r.id DESC LIMIT $2`, appID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("查询运行记录: %w", err)
+	}
+	defer rows.Close()
+
+	out := []RunRow{}
+	for rows.Next() {
+		var r RunRow
+		var finishedAt *time.Time
+		if err := rows.Scan(&r.ID, &r.LoginName, &r.Mode, &r.Status, &r.Revision,
+			&r.DurationMs, &r.ErrorCode, &r.StartedAt, &finishedAt); err != nil {
+			return nil, fmt.Errorf("读取运行记录: %w", err)
+		}
+		r.FinishedAt = finishedAt
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}

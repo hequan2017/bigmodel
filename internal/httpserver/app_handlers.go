@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/hequan2017/bigmodel/internal/api"
 	"github.com/hequan2017/bigmodel/internal/app"
@@ -301,4 +302,26 @@ func (s *Server) handleReferenceChunks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"chunks": chunks})
+}
+
+// handleAppRuns 教师/管理员查看应用运行记录（§9.3）。
+func (s *Server) handleAppRuns(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	appID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "应用 ID 非法")
+		return
+	}
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil {
+			limit = n
+		}
+	}
+	runs, err := s.apps.ListRuns(r.Context(), current.ID, current.Role == auth.RoleAdmin, appID, limit)
+	if err != nil {
+		s.writeAppError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"runs": runs})
 }
