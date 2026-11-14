@@ -62,3 +62,25 @@ type SaveAnswersInput struct {
 	ExpectedRevision int           `json:"expected_revision"`
 	Answers          []AnswerInput `json:"answers"`
 }
+
+// AttemptResult 是学生成绩视图：仅总分与提交状态（§14.8）。
+type AttemptResult struct {
+	ExamID       int64      `json:"exam_id"`
+	Status       string     `json:"status"`
+	TotalScore   *int       `json:"total_score,omitempty"`
+	SubmittedAt  *time.Time `json:"submitted_at,omitempty"`
+	SubmitReason string     `json:"submit_reason,omitempty"`
+	ServerNow    time.Time  `json:"server_now"`
+}
+
+// TeacherAttemptRow 是教师成绩视图的一行。
+type TeacherAttemptRow struct {
+	AttemptID      int64      `json:"attempt_id"`
+	UserID         int64      `json:"user_id"`
+	LoginName      string     `json:"login_name"`
+	Status         string     `json:"status"`
+	TotalScore     *int       `json:"total_score,omitempty"`
+	AnswerRevision int        `json:"answer_revision"`
+	SubmittedAt    *time.Time `json:"submitted_at,omitempty"`
+	SubmitReason   string     `json:"submit_reason,omitempty"`
+}

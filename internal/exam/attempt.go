@@ -74,7 +74,12 @@ func (s *Service) StartAttempt(ctx context.Context, userID, examID int64) (*Stud
 }
 
 // GetAttempt 恢复作答：返回已保存答案与原始截止时间（§15.2）。
+// 查询作答同时触发到期检查（§14.7）：已到期的作答先做 timeout 结算。
 func (s *Service) GetAttempt(ctx context.Context, userID, examID int64) (*StudentAttempt, error) {
+	if _, serr := s.SweepExpiredAttempts(ctx); serr != nil {
+		// 结算失败不阻断恢复视图。
+		_ = serr
+	}
 	var attemptID int64
 	var title, levelCode string
 	var deadline time.Time

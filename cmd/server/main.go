@@ -65,6 +65,9 @@ func run() error {
 	kbSvc := kb.NewService(pool, cfg.DataDir)
 	srv := httpserver.New(cfg, pool, logger, modelSvc, kbSvc)
 
+	// 到期作答自动结算循环（§14.7）。
+	srv.StartExamSweep(ctx, 30*time.Second)
+
 	// 单进程文档处理 worker；未配置 Embedding 上游时不启动，上传文档保持 queued。
 	if modelSvc.EmbeddingConfigured() {
 		docWorker := kbSvc.NewWorker(modelSvc.Embedding(), modelSvc.EmbeddingModelName(), 2*time.Second, logger)

@@ -362,3 +362,66 @@ func (s *Server) handleSaveAnswers(w http.ResponseWriter, r *http.Request) {
 		"saved_at":        savedAt,
 	})
 }
+
+// handleSubmitAttempt 学生主动交卷（幂等；过期做 timeout 结算）。
+func (s *Server) handleSubmitAttempt(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
+	var req struct {
+		ExpectedRevision int `json:"expected_revision"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "请求体必须是 JSON")
+		return
+	}
+	result, err := s.exam.SubmitAttempt(r.Context(), current.ID, examID, req.ExpectedRevision)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	audit.Record(r.Context(), s.pool, audit.Entry{
+		ActorID:      &current.ID,
+		Action:       "exam.submit",
+		ResourceType: "exam",
+		ResourceID:   int64ToString(examID),
+		Result:       result.Status + "/" + result.SubmitReason,
+	})
+	api.WriteJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+// handleAttemptResult 学生查看本人成绩（总分与提交状态）。
+func (s *Server) handleAttemptResult(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	result, err := s.exam.AttemptResult(r.Context(), current.ID, examID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"result": result})
+}
+
+// handleExamResults 教师查看本人考试的成绩列表。
+func (s *Server) handleExamResults(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	rows, err := s.exam.ListExamResults(r.Context(), current.ID, current.Role == auth.RoleAdmin, examID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"results": rows})
+}

@@ -86,6 +86,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/exam/exams/{id}/attempts", s.requireAuth(s.requireRole(s.handleStartAttempt, auth.RoleStudent)))
 	mux.HandleFunc("GET /api/exam/exams/{id}/attempts", s.requireAuth(s.requireRole(s.handleGetAttempt, auth.RoleStudent)))
 	mux.HandleFunc("PUT /api/exam/exams/{id}/attempts/answers", s.requireAuth(s.requireRole(s.handleSaveAnswers, auth.RoleStudent)))
+	mux.HandleFunc("POST /api/exam/exams/{id}/attempts/submit", s.requireAuth(s.requireRole(s.handleSubmitAttempt, auth.RoleStudent)))
+	mux.HandleFunc("GET /api/exam/exams/{id}/attempts/result", s.requireAuth(s.requireRole(s.handleAttemptResult, auth.RoleStudent)))
+	mux.HandleFunc("GET /api/exam/exams/{id}/results", s.requireAuth(s.requireRole(s.handleExamResults, kbRoles...)))
 
 	mux.HandleFunc("/", s.handleNotFound)
 
