@@ -77,6 +77,11 @@ func validateConfig(cfg AppConfig) error {
 	if cfg.HistoryTurns < 0 || cfg.HistoryTurns > MaxHistoryTurns {
 		return invalidConfig("history_turns 必须在 0-%d", MaxHistoryTurns)
 	}
+	switch cfg.RetrievalMode {
+	case "", kb.ModeVector, kb.ModeFullText, kb.ModeHybrid:
+	default:
+		return invalidConfig("retrieval_mode 必须是 vector/fulltext/hybrid")
+	}
 	return nil
 }
 
@@ -453,7 +458,8 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 	history := s.loadHistory(ctx, p.AppID, p.UserID, conv, cfg.HistoryTurns)
 
 	cands, stats, serr := s.kb.SearchForApp(ctx, cfg.KnowledgeBaseID,
-		kb.SearchRequest{Question: question, TopK: cfg.TopK}, p.Embed, p.EmbedModel)
+		kb.SearchRequest{Question: question, TopK: cfg.TopK, Mode: cfg.RetrievalMode},
+		p.Embed, p.EmbedModel)
 	if serr != nil {
 		code, msg := upstreamCode(serr)
 		_ = s.markRun(markCtx, runID, RunFailed, code, 0)

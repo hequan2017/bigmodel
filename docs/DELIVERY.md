@@ -42,7 +42,7 @@
 | 单元/集成测试 | 11 包全量，含真实数据库集成 | 0 SKIP 全过 |
 | 冒烟回归 | scripts/e2e-smoke.sh，23 项断言一键验证 | 23/23 PASS |
 | 容量压测 | 20 / 100 / 300 学生三阶段实测（README 数据表） | 全部 0 错误 |
-| 检索评测 | cmd/evaluate + 20 条评测集 | mock 下无参考意义，待真实模型 |
+| 检索评测 | cmd/evaluate + 20 条评测集，支持三通道 | 全文通道 Top-1 100%（真实有效）；vector/hybrid 待真实模型（见 docs/eval/RESULTS.md） |
 | 浏览器验收 | 登录/双链路/教师端实操（截图见 docs/screenshots） | 全部通过 |
 | 代码卫生 | TODO/FIXME/硬编码口令/.env 扫描、gofmt、govulncheck | 全绿无漏洞 |
 | 安全抽查 | 越权 403/未认证 401/SQL 注入尝试 401（参数化查询） | 行为正确 |
@@ -56,13 +56,16 @@ go run ./cmd/server            # 或容器化：docker compose up -d app
 ```
 
 账号：admin / teacher / student（口令见 .env.example 或默认 admin@123 等）。
-检索评测：`go run ./cmd/evaluate -kb <ID>`（需真实 Embedding 上游）。
+检索评测：`go run ./cmd/evaluate -kb <ID> -mode fulltext|vector|hybrid`
+（全文通道任何上游配置下均有效；向量通道需真实 Embedding 上游）。
 回归：`bash scripts/e2e-smoke.sh`。
 
 ## 四、已知限制（如实说明）
 
-1. **模型上游为 mock**：检索排序与回答内容无语义意义，评测命中率
-   待真实模型接入后方为有效（唯一被外部依赖阻塞的大项）。
+1. **模型上游为 mock**：向量语义排序与回答内容无语义意义，vector/hybrid
+   通道命中率待真实模型接入后方为有效；全文通道评测已有效
+   （Top-1 100%，见 docs/eval/RESULTS.md）。应用可设
+   `retrieval_mode: fulltext` 规避 mock 噪声对 RRF 融合的拖累。
 2. **单实例**：文档原始文件在本地卷，多副本需对象存储改造（§16.2）。
 3. **登录限速为内存实现**：多副本需共享存储。
 4. **学生端逐题得分默认不开放**（§14.8 计划口径）。

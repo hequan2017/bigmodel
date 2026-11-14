@@ -206,6 +206,26 @@ func TestAppLifecycleAndRunIntegration(t *testing.T) {
 	if _, err := svc.CreateDraft(ctx, teacherID, "A", badTopK); !errors.Is(err, ErrInvalidConfig) {
 		t.Errorf("topK 超限应 ErrInvalidConfig, got %v", err)
 	}
+	badMode := goodCfg
+	badMode.RetrievalMode = "bogus"
+	if _, err := svc.CreateDraft(ctx, teacherID, "A", badMode); !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("非法 retrieval_mode 应 ErrInvalidConfig, got %v", err)
+	}
+
+	// 全文通道固定：Embedding 为 mock 时可固定 fulltext（评测依据见 docs/eval/RESULTS.md）。
+	ftCfg := goodCfg
+	ftCfg.RetrievalMode = "fulltext"
+	ftApp, err := svc.CreateDraft(ctx, teacherID, "全文通道应用", ftCfg)
+	if err != nil {
+		t.Fatalf("创建全文通道应用: %v", err)
+	}
+	got, err := svc.Get(ctx, teacherID, "teacher", false, ftApp.ID)
+	if err != nil {
+		t.Fatalf("读取应用: %v", err)
+	}
+	if got.DraftConfig == nil || got.DraftConfig.RetrievalMode != "fulltext" {
+		t.Errorf("retrieval_mode 应随配置保存, got %+v", got.DraftConfig)
+	}
 
 	a, err := svc.CreateDraft(ctx, teacherID, "教育问答助手", goodCfg)
 	if err != nil {

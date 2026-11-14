@@ -45,6 +45,9 @@ type AppConfig struct {
 	TopK            int    `json:"top_k"`
 	MaxTokens       int    `json:"max_tokens"`
 	HistoryTurns    int    `json:"history_turns"`
+	// RetrievalMode 检索通道：vector/fulltext/hybrid；空值默认 hybrid。
+	// Embedding 上游尚为 mock 时可固定 fulltext（实测数据见 docs/eval/RESULTS.md）。
+	RetrievalMode string `json:"retrieval_mode,omitempty"`
 }
 
 // App 是应用的展示结构。

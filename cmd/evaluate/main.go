@@ -3,13 +3,16 @@
 // 输出 top1 / topK 命中率与未命中明细。
 //
 // 评测集见 docs/eval/eval_set.json（20 条，基于演示资料命题）。
-// 当前 mock 上游下所有向量相同，命中率无参考意义；
-// 接入真实 Embedding 模型后运行方为有效指标。
+// 指标有效性按通道区分（§7.4）：
+//   - fulltext：真实词项相关性，任何上游配置下均为有效指标；
+//   - vector / hybrid：依赖 Embedding 上游语义，mock 上游下
+//     所有查询向量相同，命中率无参考意义，接入真实模型后方为有效。
 //
 // 用法：
 //
 //	go run ./cmd/evaluate -base http://127.0.0.1:18080 \
-//	  -user teacher -pass teacher@123 -kb 31 -set docs/eval/eval_set.json
+//	  -user teacher -pass teacher@123 -kb 31 -mode fulltext \
+//	  -set docs/eval/eval_set.json
 package main
 
 import (
@@ -80,7 +83,15 @@ func main() {
 	kbID := flag.Int("kb", 0, "被测知识库 ID（必填）")
 	setPath := flag.String("set", "docs/eval/eval_set.json", "评测集文件")
 	topK := flag.Int("top-k", 2, "检索返回候选数")
+	mode := flag.String("mode", "fulltext", "检索通道：vector / fulltext / hybrid")
 	flag.Parse()
+
+	switch *mode {
+	case "vector", "fulltext", "hybrid":
+	default:
+		fmt.Fprintf(os.Stderr, "mode 必须是 vector/fulltext/hybrid，得到 %q\n", *mode)
+		os.Exit(1)
+	}
 
 	if *kbID == 0 {
 		fmt.Fprintln(os.Stderr, "必须指定 -kb 知识库 ID")
@@ -104,14 +115,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("检索评测开始：知识库 #%d，评测问题 %d 条，Top-K %d\n",
-		*kbID, len(set.Cases), *topK)
-	fmt.Println("说明：mock 上游下命中率无参考意义，接入真实模型后方为有效指标。")
+	fmt.Printf("检索评测开始：知识库 #%d，通道 %s，评测问题 %d 条，Top-K %d\n",
+		*kbID, *mode, len(set.Cases), *topK)
+	if *mode == "fulltext" {
+		fmt.Println("说明：全文通道为真实词项相关性（ts_rank），指标有效。")
+	} else {
+		fmt.Println("说明：该通道依赖 Embedding 语义；mock 上游下命中率无参考意义，接入真实模型后方为有效指标。")
+	}
 
 	top1Hits, topKHits := 0, 0
 	var misses []string
 	for i, c := range set.Cases {
-		payload, _ := json.Marshal(map[string]any{"question": c.Question, "top_k": *topK})
+		payload, _ := json.Marshal(map[string]any{"question": c.Question, "top_k": *topK, "mode": *mode})
 		req := strings.NewReader(string(payload))
 		resp, err := httpPost(*base+fmt.Sprintf("/api/kb/%d/search", *kbID),
 			"application/json", req, token)

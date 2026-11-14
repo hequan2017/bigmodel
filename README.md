@@ -279,6 +279,22 @@ cat backup_2026-11-14.sql | docker compose exec -T db psql -U bigmodel -d bigmod
 恢复演练要求：在隔离环境完成"备份 → 恢复 → readyz/登录/检索抽查"全流程
 并记录可接受的数据丢失窗口（RPO）与恢复时间（RTO），不能只备份不演练。
 
+## 运维：升级到含全文检索版本后的索引重建
+
+迁移 011（document_chunks.fts）内置回填使用 PG 默认解析器，对既有中文语料
+不切分、检索质量差。升级后对每个既有知识库执行一次重建（不重新向量化）：
+
+```bash
+TOKEN=$(curl -s -X POST http://127.0.0.1:18080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"login_name":"teacher","password":"teacher@123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")
+curl -s -X POST http://127.0.0.1:18080/api/kb/<知识库ID>/reindex -H "Authorization: Bearer $TOKEN"
+# 返回 {"reindexed_chunks":N} 即完成；新上传/重新处理的文档无需重建
+```
+
+Embedding 上游尚为 mock 时，问答应用建议在配置中设 `"retrieval_mode":"fulltext"`
+固定全文通道（实测数据见 docs/eval/RESULTS.md），接入真实模型后再评估 hybrid。
+
 ## 当前进度（P0）
 
 - [x] ① 项目骨架 / 配置加载 / 数据库迁移 / 健康检查
