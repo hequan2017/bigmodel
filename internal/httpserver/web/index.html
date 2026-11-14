@@ -29,6 +29,15 @@
   </form>
 </div>
 <script>
+// 已登录用户直接跳转对应端页面。
+(() => {
+  const token = sessionStorage.getItem("token");
+  const role = sessionStorage.getItem("role");
+  if (!token) return;
+  if (role === "student") location.replace("/exam.html");
+  else if (role === "teacher" || role === "admin") location.replace("/teacher.html");
+})();
+
 document.getElementById("login").onsubmit = async (e) => {
   e.preventDefault();
   const msg = document.getElementById("msg");

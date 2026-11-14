@@ -19,5 +19,10 @@ func (s *Server) staticHandler() http.Handler {
 			http.Error(w, "static assets unavailable", http.StatusInternalServerError)
 		})
 	}
-	return http.FileServer(http.FS(sub))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 页面迭代期间禁用浏览器缓存，避免用户拿到旧版页面；
+		// 静态资源体量小（KB 级），重新拉取代价可忽略。
+		w.Header().Set("Cache-Control", "no-cache")
+		http.FileServer(http.FS(sub)).ServeHTTP(w, r)
+	})
 }

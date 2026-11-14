@@ -670,7 +670,9 @@ async function showStats() {
       tr.innerHTML = `<td>${it.order_no}</td><td>${it.stem}</td><td>${it.attempted}</td>
         <td><span class="badge ok">${it.correct}</span></td>
         <td><span class="badge err">${it.wrong}</span></td>
-        <td>${it.error_rate.toFixed(0)}%</td>`;
+        <td><div style="background:#fee2e2;border-radius:4px;width:80px;height:10px">
+              <div style="background:#dc2626;border-radius:4px;height:10px;width:${it.error_rate.toFixed(0)}%"></div>
+            </div> <span class="meta">${it.error_rate.toFixed(0)}%</span></td>`;
       tbody.appendChild(tr);
     }
   } catch (e) {
