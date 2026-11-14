@@ -39,7 +39,6 @@ func (s *Service) StartAttempt(ctx context.Context, userID, examID int64) (*Stud
 	if err := s.pool.QueryRow(ctx, `SELECT now()`).Scan(&dbNow); err != nil {
 		return nil, fmt.Errorf("查询数据库时间: %w", err)
 	}
-	fmt.Printf("DEBUG 窗口: dbNow=%v open=%v close=%v\n", dbNow.Format(time.RFC3339Nano), openAt.Format(time.RFC3339Nano), closeAt.Format(time.RFC3339Nano))
 	if dbNow.Before(*openAt) {
 		return nil, ErrExamNotOpen
 	}
@@ -107,10 +106,12 @@ func (s *Service) buildStudentAttempt(ctx context.Context, userID, examID int64,
 	var startedAt time.Time
 	var submittedAt *time.Time
 	var totalScore *int
+	var closeAt time.Time
 	if err := s.pool.QueryRow(ctx, `
-		SELECT status, started_at, submitted_at, total_score
-		FROM exam_attempts WHERE id = $1`, attemptID,
-	).Scan(&status, &startedAt, &submittedAt, &totalScore); err != nil {
+		SELECT a.status, a.started_at, a.submitted_at, a.total_score, e.close_at
+		FROM exam_attempts a JOIN exams e ON e.id = a.exam_id
+		WHERE a.id = $1`, attemptID,
+	).Scan(&status, &startedAt, &submittedAt, &totalScore, &closeAt); err != nil {
 		return nil, fmt.Errorf("查询作答状态: %w", err)
 	}
 
@@ -160,6 +161,7 @@ func (s *Service) buildStudentAttempt(ctx context.Context, userID, examID int64,
 		Status:         status,
 		StartedAt:      startedAt,
 		DeadlineAt:     deadline,
+		CloseAt:        closeAt,
 		ServerNow:      serverNow,
 		AnswerRevision: revision,
 		TotalScore:     totalScore,

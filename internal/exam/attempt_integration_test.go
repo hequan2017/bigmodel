@@ -13,6 +13,12 @@ import (
 func seedPublishedExam(t *testing.T, svc *Service, teacherID int64, title string, openOffset, closeOffset, duration time.Duration) (examID, q1ID, q2ID int64) {
 	t.Helper()
 	ctx := context.Background()
+	// 窗口时间从数据库时钟推导：消除宿主与 DB 容器时钟漂移的影响。
+	var dbNow time.Time
+	if err := svc.pool.QueryRow(ctx, `SELECT now()`).Scan(&dbNow); err != nil {
+		t.Fatalf("查询数据库时间: %v", err)
+	}
+	dbNow = dbNow.Truncate(time.Second)
 	q1, err := svc.CreateQuestion(ctx, teacherID, QuestionInput{
 		Type: "single", Stem: title + " 单选",
 		Options:       []Option{{Key: "A", Text: "甲"}, {Key: "B", Text: "乙"}, {Key: "C", Text: "丙"}},
@@ -27,8 +33,8 @@ func seedPublishedExam(t *testing.T, svc *Service, teacherID int64, title string
 	if err != nil {
 		t.Fatalf("创建判断: %v", err)
 	}
-	open := time.Now().Add(openOffset).Format(time.RFC3339)
-	close := time.Now().Add(closeOffset).Format(time.RFC3339)
+	open := dbNow.Add(openOffset).Format(time.RFC3339)
+	close := dbNow.Add(closeOffset).Format(time.RFC3339)
 	seconds := int(duration.Seconds())
 	e, err := svc.CreateExam(ctx, teacherID, ExamInput{
 		Title: title, LevelCode: "L1", OpenAt: &open, CloseAt: &close, DurationSeconds: &seconds,
@@ -205,8 +211,12 @@ func TestAttemptWindowIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("开始: %v", err)
 	}
-	now := time.Now()
-	if a.DeadlineAt.Sub(now) > shortClose+5*time.Second || a.DeadlineAt.Before(now) {
-		t.Errorf("截止应取 min(时长, close): deadline=%v", a.DeadlineAt)
+	// 截止与 close_at 都来自 DB 时钟：直接对比两者（消除宿主/容器时钟偏差影响）。
+	if a.CloseAt.IsZero() {
+		t.Fatal("CloseAt 未返回")
+	}
+	diff := a.DeadlineAt.Sub(a.CloseAt)
+	if diff > 2*time.Second || diff < -2*time.Second {
+		t.Errorf("截止应取 min(时长, close): deadline=%v close=%v", a.DeadlineAt, a.CloseAt)
 	}
 }

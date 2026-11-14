@@ -33,6 +33,7 @@ type StudentAttempt struct {
 	Status         string            `json:"status"`
 	StartedAt      time.Time         `json:"started_at"`
 	DeadlineAt     time.Time         `json:"deadline_at"`
+	CloseAt        time.Time         `json:"close_at"`
 	ServerNow      time.Time         `json:"server_now"`
 	AnswerRevision int               `json:"answer_revision"`
 	TotalScore     *int              `json:"total_score,omitempty"`
