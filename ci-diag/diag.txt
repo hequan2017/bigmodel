@@ -1,0 +1,106 @@
+=== e2e 输出 ===
+=== 双链路冒烟回归（http://127.0.0.1:18080）===
+  PASS  教师登录
+  PASS  学生登录
+  PASS  创建知识库 #2
+  PASS  上传演示文档
+  PASS  文档向量化 ready（worker）
+  PASS  向量检索命中
+  PASS  全文检索命中
+  PASS  默认混合检索通道
+  PASS  全文索引重建
+  PASS  创建问答应用 #1
+  PASS  发布应用
+  PASS  SSE 问答有回答（OK，来自模拟上游）
+  PASS  创建考试 #1
+  PASS  创建两道题目
+  PASS  设置试卷条目
+  PASS  发布考试
+  PASS  开始考试且答案不泄漏
+  PASS  保存答案
+  PASS  交卷
+  PASS  判分正确（全对 10 分）
+  PASS  会话列表返回（1 个会话）
+  PASS  删除会话
+  PASS  删除后列表刷新
+================================
+冒烟回归完成：PASS 23 / FAIL 0
+=== seed.log ===
+已就绪账号: admin (admin)
+已就绪账号: teacher (teacher)
+已就绪账号: student (student)
+  演示资料: 01-人工智能基础.md → 新上传（queued）
+  演示资料: 02-检索增强生成RAG入门.md → 新上传（queued）
+  演示资料: 03-提示词工程实践.md → 新上传（queued）
+  演示资料: 04-大模型应用安全与权限.md → 新上传（queued）
+  说明：文档由服务端 worker 在运行时向量化（需配置 Embedding 上游）
+  客观题: 新增 16 道，跳过已存在 0 道
+提示：口令可通过 APP_SEED_*_PASSWORD 环境变量覆盖
+=== server.log ===
+{"time":"2026-11-14T20:31:19.654283925Z","level":"INFO","msg":"数据库迁移完成"}
+{"time":"2026-11-14T20:31:19.655431569Z","level":"INFO","msg":"模型配置已就绪","chat_configured":true,"embedding_configured":true}
+{"time":"2026-11-14T20:31:19.656151129Z","level":"INFO","msg":"文档处理 worker 已启动","embedding_model":"mock-embedding"}
+{"time":"2026-11-14T20:31:19.656161655Z","level":"INFO","msg":"HTTP 服务已启动","addr":":18080"}
+{"time":"2026-11-14T20:31:20.592831366Z","level":"INFO","msg":"http_request","request_id":"39c89dd0425b462373611c643c603b21","method":"GET","path":"/readyz","status":200,"duration_ms":0,"remote_addr":"127.0.0.1:60466"}
+{"time":"2026-11-14T20:31:20.598249888Z","level":"INFO","msg":"http_request","request_id":"5fbe6e1b201e8c9b125c21da98cb8e3f","method":"GET","path":"/readyz","status":200,"duration_ms":0,"remote_addr":"127.0.0.1:60478"}
+{"time":"2026-11-14T20:31:21.30065133Z","level":"INFO","msg":"http_request","request_id":"b5767b138988139239e51cbdcc0eb2a9","method":"POST","path":"/api/auth/login","status":200,"duration_ms":59,"remote_addr":"127.0.0.1:60484"}
+{"time":"2026-11-14T20:31:21.369740792Z","level":"INFO","msg":"http_request","request_id":"ca27ac8bbe00ac7a887dc25a582cf43b","method":"POST","path":"/api/auth/login","status":200,"duration_ms":58,"remote_addr":"127.0.0.1:60498"}
+{"time":"2026-11-14T20:31:21.385790925Z","level":"INFO","msg":"http_request","request_id":"2709effe2feba640ae85f2a7b0741bbb","method":"POST","path":"/api/kb","status":201,"duration_ms":2,"remote_addr":"127.0.0.1:60506"}
+{"time":"2026-11-14T20:31:21.407468283Z","level":"INFO","msg":"http_request","request_id":"8be44874bd88e638d9c156047b525795","method":"POST","path":"/api/kb/2/documents","status":201,"duration_ms":5,"remote_addr":"127.0.0.1:60518"}
+{"time":"2026-11-14T20:31:21.417061174Z","level":"INFO","msg":"http_request","request_id":"00f7d8d722bfcd56b2d7478f39a2e158","method":"GET","path":"/api/kb/2","status":200,"duration_ms":1,"remote_addr":"127.0.0.1:60522"}
+{"time":"2026-11-14T20:31:22.449371609Z","level":"INFO","msg":"文档处理完成","document_id":1,"chunks":1,"dimension":8,"retry_count":0}
+{"time":"2026-11-14T20:31:22.451852381Z","level":"INFO","msg":"文档处理完成","document_id":2,"chunks":1,"dimension":8,"retry_count":0}
+{"time":"2026-11-14T20:31:22.454068136Z","level":"INFO","msg":"文档处理完成","document_id":3,"chunks":1,"dimension":8,"retry_count":0}
+{"time":"2026-11-14T20:31:22.456177387Z","level":"INFO","msg":"文档处理完成","document_id":4,"chunks":1,"dimension":8,"retry_count":0}
+{"time":"2026-11-14T20:31:22.458862124Z","level":"INFO","msg":"文档处理完成","document_id":5,"chunks":1,"dimension":8,"retry_count":0}
+{"time":"2026-11-14T20:31:23.43831818Z","level":"INFO","msg":"http_request","request_id":"4e48f8dd87cebb17c2d7c5a7c361e8c4","method":"GET","path":"/api/kb/2","status":200,"duration_ms":1,"remote_addr":"127.0.0.1:60530"}
+{"time":"2026-11-14T20:31:23.457640951Z","level":"INFO","msg":"http_request","request_id":"b5905cf0d5afd55fb1e7c421f71f602e","method":"POST","path":"/api/kb/2/search","status":200,"duration_ms":2,"remote_addr":"127.0.0.1:60536"}
+{"time":"2026-11-14T20:31:23.484191183Z","level":"INFO","msg":"http_request","request_id":"26e3483e4c6fd10493110f7735b5ffad","method":"POST","path":"/api/kb/2/search","status":200,"duration_ms":2,"remote_addr":"127.0.0.1:60552"}
+{"time":"2026-11-14T20:31:23.504257999Z","level":"INFO","msg":"http_request","request_id":"e36852842a4d5675ef61c0f5cd5f5d0c","method":"POST","path":"/api/kb/2/search","status":200,"duration_ms":4,"remote_addr":"127.0.0.1:60562"}
+{"time":"2026-11-14T20:31:23.520465984Z","level":"INFO","msg":"http_request","request_id":"ef8bbdc91e87f7b1edf40a31e474546d","method":"POST","path":"/api/kb/2/reindex","status":200,"duration_ms":2,"remote_addr":"127.0.0.1:60566"}
+{"time":"2026-11-14T20:31:23.528694311Z","level":"INFO","msg":"http_request","request_id":"e5ecd9c19fdbd838ac10bcd7abec882c","method":"POST","path":"/api/apps","status":201,"duration_ms":2,"remote_addr":"127.0.0.1:60582"}
+{"time":"2026-11-14T20:31:23.546395468Z","level":"INFO","msg":"http_request","request_id":"7f940aecb7df898b79b0532011f1bdf5","method":"POST","path":"/api/apps/1/publish","status":200,"duration_ms":1,"remote_addr":"127.0.0.1:60586"}
+{"time":"2026-11-14T20:31:23.658619771Z","level":"INFO","msg":"http_request","request_id":"48ed616f965f096c8908181647b02ed4","method":"POST","path":"/api/apps/1/run","status":200,"duration_ms":106,"remote_addr":"127.0.0.1:60592"}
+{"time":"2026-11-14T20:31:23.70922717Z","level":"INFO","msg":"http_request","request_id":"d56b6d799ee7c03588ff224022c2dda2","method":"POST","path":"/api/exam/exams","status":201,"duration_ms":2,"remote_addr":"127.0.0.1:60600"}
+{"time":"2026-11-14T20:31:23.730523682Z","level":"INFO","msg":"http_request","request_id":"3f7891eceb6b45efe51e08b0dfb6459c","method":"POST","path":"/api/exam/questions","status":201,"duration_ms":2,"remote_addr":"127.0.0.1:60604"}
+{"time":"2026-11-14T20:31:23.748213538Z","level":"INFO","msg":"http_request","request_id":"736eddb5453f3b096f82d0e9c9354ef7","method":"POST","path":"/api/exam/questions","status":201,"duration_ms":1,"remote_addr":"127.0.0.1:60620"}
+{"time":"2026-11-14T20:31:23.769354712Z","level":"INFO","msg":"http_request","request_id":"0cb7dc2249cfeb9713692ee9662dd49a","method":"PUT","path":"/api/exam/exams/1/items","status":200,"duration_ms":3,"remote_addr":"127.0.0.1:60622"}
+{"time":"2026-11-14T20:31:23.777881071Z","level":"INFO","msg":"http_request","request_id":"12ce31443eac6a8934210e15ca970458","method":"POST","path":"/api/exam/exams/1/publish","status":200,"duration_ms":2,"remote_addr":"127.0.0.1:60630"}
+{"time":"2026-11-14T20:31:23.78631055Z","level":"INFO","msg":"http_request","request_id":"5064036318d88830f0ccc7d05296eeb3","method":"POST","path":"/api/exam/exams/1/attempts","status":200,"duration_ms":2,"remote_addr":"127.0.0.1:60636"}
+{"time":"2026-11-14T20:31:23.851477144Z","level":"INFO","msg":"http_request","request_id":"4f8571fa257357406fe1a0bec459b43e","method":"PUT","path":"/api/exam/exams/1/attempts/answers","status":200,"duration_ms":3,"remote_addr":"127.0.0.1:60642"}
+{"time":"2026-11-14T20:31:23.859816372Z","level":"INFO","msg":"http_request","request_id":"f3cdfe47a3fe7931a12239f54abc238a","method":"POST","path":"/api/exam/exams/1/attempts/submit","status":200,"duration_ms":2,"remote_addr":"127.0.0.1:60656"}
+{"time":"2026-11-14T20:31:23.865987084Z","level":"INFO","msg":"http_request","request_id":"52f56a0c9e83f58664e46280b86bb6ef","method":"GET","path":"/api/exam/exams/1/attempts/result","status":200,"duration_ms":0,"remote_addr":"127.0.0.1:60672"}
+{"time":"2026-11-14T20:31:23.884697262Z","level":"INFO","msg":"http_request","request_id":"f60c5a7e59d57ada1c1d810c7e321b75","method":"GET","path":"/api/apps/1/conversations","status":200,"duration_ms":1,"remote_addr":"127.0.0.1:60688"}
+{"time":"2026-11-14T20:31:23.926933495Z","level":"INFO","msg":"http_request","request_id":"117e704a690834dab91773aa924b8d06","method":"DELETE","path":"/api/apps/1/conversations/02e801331b958dc9ddd1b58d0a11f193","status":200,"duration_ms":0,"remote_addr":"127.0.0.1:60692"}
+{"time":"2026-11-14T20:31:23.932907762Z","level":"INFO","msg":"http_request","request_id":"8427a0b612196e4d49b918ef7039e53c","method":"GET","path":"/api/apps/1/conversations","status":200,"duration_ms":0,"remote_addr":"127.0.0.1:60696"}
+=== mock.log ===
+模拟上游已启动: :18081
+=== 扩展 ===
+ extname 
+---------
+ plpgsql
+ vector
+(2 rows)
+
+=== 迁移表 ===
+         version         
+-------------------------
+ 001_init.sql
+ 002_sessions.sql
+ 003_model_profiles.sql
+ 004_knowledge_bases.sql
+ 005_document_chunks.sql
+ 006_apps.sql
+ 007_exam_questions.sql
+ 008_exams.sql
+ 009_attempts.sql
+ 010_awarded_score.sql
+ 011_fulltext.sql
+(11 rows)
+
+=== document_chunks 是否存在 ===
+   to_regclass   
+-----------------
+ document_chunks
+(1 row)
+
