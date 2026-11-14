@@ -31,6 +31,7 @@ var (
 	ErrInvalidCredentials = errors.New("登录名或密码不正确")
 	ErrUserDisabled       = errors.New("账号已停用")
 	ErrUnauthorized       = errors.New("未登录或会话已失效")
+	ErrTooManyAttempts    = errors.New("失败次数过多，账号已临时锁定")
 )
 
 // Authenticator 校验会话令牌并返回当前用户，供权限中间件依赖。
@@ -56,17 +57,28 @@ var dummyHash = func() []byte {
 
 // Service 基于 PostgreSQL 的认证服务。
 type Service struct {
-	pool *pgxpool.Pool
-	ttl  time.Duration
+	pool    *pgxpool.Pool
+	ttl     time.Duration
+	limiter *loginLimiter
 }
 
 // NewService 构造认证服务；ttl 为会话有效期。
 func NewService(pool *pgxpool.Pool, ttl time.Duration) *Service {
-	return &Service{pool: pool, ttl: ttl}
+	return &Service{pool: pool, ttl: ttl, limiter: newLoginLimiter()}
+}
+
+// SetLoginLockDuration 设置连续失败后的锁定时长（测试可注入更短时长）。
+func (s *Service) SetLoginLockDuration(d time.Duration) {
+	s.limiter.lockDuration = d
 }
 
 // Login 校验登录名与密码，成功时创建会话并返回令牌。
 func (s *Service) Login(ctx context.Context, loginName, password string) (string, *User, error) {
+	if locked, remain := s.limiter.lockedRemaining(loginName); locked {
+		s.recordLoginAudit(ctx, nil, "locked", loginName)
+		return "", nil, fmt.Errorf("%w: 请约 %d 秒后重试", ErrTooManyAttempts, int(remain.Seconds())+1)
+	}
+
 	user, err := s.findUserByLogin(ctx, loginName)
 	if err != nil {
 		return "", nil, err
@@ -75,6 +87,7 @@ func (s *Service) Login(ctx context.Context, loginName, password string) (string
 	if user == nil {
 		// 未知登录名也执行一次比较，避免响应时间差异泄漏账号存在性。
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		s.limiter.fail(loginName)
 		s.recordLoginAudit(ctx, nil, "failed", loginName)
 		return "", nil, ErrInvalidCredentials
 	}
@@ -83,9 +96,11 @@ func (s *Service) Login(ctx context.Context, loginName, password string) (string
 		return "", nil, ErrUserDisabled
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		s.limiter.fail(loginName)
 		s.recordLoginAudit(ctx, &user.ID, "failed", loginName)
 		return "", nil, ErrInvalidCredentials
 	}
+	s.limiter.reset(loginName)
 
 	token, err := newToken()
 	if err != nil {

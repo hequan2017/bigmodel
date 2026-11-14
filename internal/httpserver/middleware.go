@@ -36,6 +36,10 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 			reqID = api.NewRequestID()
 		}
 		w.Header().Set("X-Request-ID", reqID)
+		// 安全响应头：全部响应统一携带。
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		r = r.WithContext(api.WithRequestID(r.Context(), reqID))
 
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}

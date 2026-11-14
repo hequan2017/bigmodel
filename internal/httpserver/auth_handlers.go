@@ -37,6 +37,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, auth.ErrUserDisabled):
 		api.WriteError(w, r, http.StatusUnauthorized, "user_disabled", "账号已停用")
 		return
+	case errors.Is(err, auth.ErrTooManyAttempts):
+		api.WriteError(w, r, http.StatusTooManyRequests, "too_many_attempts", err.Error())
+		return
 	case err != nil:
 		s.log.Error("登录处理失败", "error", err)
 		api.WriteError(w, r, http.StatusInternalServerError, "internal_error", "登录失败，请稍后重试")
