@@ -762,6 +762,8 @@ type RunRow struct {
 	ErrorCode  string     `json:"error_code,omitempty"`
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	// RetrievalStats 是检索通道统计原文（§7.4：每路候选数/耗时/降级原因）。
+	RetrievalStats json.RawMessage `json:"retrieval_stats,omitempty"`
 }
 
 // ListRuns 返回本人应用（管理员全量）的最近运行记录。
@@ -781,7 +783,8 @@ func (s *Service) ListRuns(ctx context.Context, userID int64, isAdmin bool, appI
 	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT r.id, u.login_name, r.mode, r.status, r.revision,
-		       r.duration_ms, COALESCE(r.error_code, ''), r.started_at, r.finished_at
+		       r.duration_ms, COALESCE(r.error_code, ''), r.started_at, r.finished_at,
+		       r.retrieval_stats
 		FROM app_runs r JOIN users u ON u.id = r.user_id
 		WHERE r.app_id = $1
 		ORDER BY r.id DESC LIMIT $2`, appID, limit)
@@ -795,7 +798,8 @@ func (s *Service) ListRuns(ctx context.Context, userID int64, isAdmin bool, appI
 		var r RunRow
 		var finishedAt *time.Time
 		if err := rows.Scan(&r.ID, &r.LoginName, &r.Mode, &r.Status, &r.Revision,
-			&r.DurationMs, &r.ErrorCode, &r.StartedAt, &finishedAt); err != nil {
+			&r.DurationMs, &r.ErrorCode, &r.StartedAt, &finishedAt,
+			&r.RetrievalStats); err != nil {
 			return nil, fmt.Errorf("读取运行记录: %w", err)
 		}
 		r.FinishedAt = finishedAt

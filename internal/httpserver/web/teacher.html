@@ -151,6 +151,24 @@
       </div>
       <div id="kbList"></div>
     </div>
+    <div class="card"><h2>检索调试</h2>
+      <div class="row">
+        <label>知识库 <select id="dbgKb"></select></label>
+        <label>模式 <select id="dbgMode">
+          <option value="hybrid">混合（向量+全文 RRF）</option>
+          <option value="vector">向量语义</option>
+          <option value="fulltext">全文检索</option>
+        </select></label>
+        <label>TopK <input id="dbgTopK" type="number" value="5" min="1" max="20" style="width:56px"></label>
+      </div>
+      <div class="row">
+        <input id="dbgQuery" placeholder="检索问题，例如：RAG 的基本流程" style="flex:1"
+               onkeydown="if(event.key==='Enter')debugSearch()">
+        <button class="act" onclick="debugSearch()">检索</button>
+      </div>
+      <span id="dbgMsg" class="err"></span>
+      <div id="dbgResults"></div>
+    </div>
   </section>
 
   <!-- 问答应用 -->
@@ -185,7 +203,7 @@
     </div>
     <div class="card hidden" id="runsBox">
       <h3>运行记录：<span id="runsAppName"></span>（最近 50 条，不含学生问题全文）</h3>
-      <table id="runsTable"><thead><tr><th>学生</th><th>模式</th><th>状态</th><th>耗时</th><th>时间</th><th>错误</th></tr></thead><tbody></tbody></table>
+      <table id="runsTable"><thead><tr><th>学生</th><th>模式</th><th>状态</th><th>耗时</th><th>时间</th><th>错误</th><th>检索</th></tr></thead><tbody></tbody></table>
       <div id="runsMsg" class="err"></div>
     </div>
     <div class="card hidden" id="debugBox">
@@ -505,12 +523,17 @@ async function loadKBs() {
   const d = await api("GET", "/api/kb");
   const sel = document.getElementById("uploadKb");
   sel.innerHTML = "";
+  const dbgSel = document.getElementById("dbgKb");
+  dbgSel.innerHTML = "";
   const box = document.getElementById("kbList");
   box.innerHTML = "";
   for (const k of d.knowledge_bases) {
     const opt = document.createElement("option");
     opt.value = k.id; opt.textContent = `#${k.id} ${k.name}（${k.doc_count} 篇文档）`;
     sel.appendChild(opt);
+    const dbgOpt = document.createElement("option");
+    dbgOpt.value = k.id; dbgOpt.textContent = `#${k.id} ${k.name}`;
+    dbgSel.appendChild(dbgOpt);
 
     const card = document.createElement("div");
     card.className = "card";
@@ -541,6 +564,55 @@ async function loadKBs() {
     });
   }
 }
+/* ---------- 检索调试（vector/fulltext/hybrid，§7.4） ---------- */
+const CHANNEL_LABEL = { hybrid: "混合", vector: "向量", fulltext: "全文" };
+function channelBadge(ch) {
+  const cls = ch === "hybrid" ? "ok" : ch === "vector" ? "warn" : "err";
+  return `<span class="badge ${cls}">${CHANNEL_LABEL[ch] || ch}</span>`;
+}
+async function debugSearch() {
+  const kbId = document.getElementById("dbgKb").value;
+  const msg = document.getElementById("dbgMsg");
+  const box = document.getElementById("dbgResults");
+  msg.textContent = "";
+  if (!kbId) { msg.textContent = "请先创建知识库"; return; }
+  const body = {
+    question: document.getElementById("dbgQuery").value.trim(),
+    top_k: parseInt(document.getElementById("dbgTopK").value) || 5,
+    mode: document.getElementById("dbgMode").value
+  };
+  if (!body.question) { msg.textContent = "请输入检索问题"; return; }
+  box.innerHTML = '<div class="meta">检索中...</div>';
+  try {
+    const d = await api("POST", `/api/kb/${kbId}/search`, body);
+    box.innerHTML = "";
+    if (!d.candidates.length) {
+      box.innerHTML = '<div class="meta">无命中候选。全文模式下请检查词项是否出现在语料中。</div>';
+      return;
+    }
+    for (const c of d.candidates) {
+      const div = document.createElement("div");
+      div.className = "row";
+      const score = c.rrf_score != null
+        ? `RRF ${c.rrf_score.toFixed(4)}`
+        : `得分 ${c.score.toFixed(4)}`;
+      const snippet = c.content.length > 120 ? c.content.slice(0, 120) + "…" : c.content;
+      div.innerHTML = `<span style="min-width:28px">#${c.rank}</span> ${channelBadge(c.retrieval_channel)}
+        <div style="flex:1">
+          <div><b>${c.document_title}</b>
+            <span class="meta">${c.source_locator.heading ? "· " + c.source_locator.heading + " " : ""}
+            · 偏移 [${c.source_locator.start_offset}, ${c.source_locator.end_offset}) · ${score}</span></div>
+          <div class="meta">${snippet.replace(/</g, "&lt;")}</div>
+        </div>
+        <button class="act gray" onclick="showChunks(${kbId}, ${c.document_id}, this)">原文</button>`;
+      box.appendChild(div);
+    }
+  } catch (e) {
+    box.innerHTML = "";
+    msg.textContent = e.message || "检索失败";
+  }
+}
+
 async function retryDoc(kbId, docId) {
   try { await api("POST", `/api/kb/${kbId}/documents/${docId}/retry`); loadKBs(); }
   catch (e) { alert(e.message); }
@@ -619,7 +691,7 @@ async function showRuns(appId, name) {
     const d = await api("GET", `/api/apps/${appId}/runs?limit=50`);
     tbody.innerHTML = "";
     if (d.runs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="meta">暂无运行记录</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="meta">暂无运行记录</td></tr>';
       return;
     }
     for (const r of d.runs) {
@@ -631,11 +703,12 @@ async function showRuns(appId, name) {
         <td>${r.mode === "debug" ? "调试" : "发布"}</td><td>${badge}</td>
         <td>${r.duration_ms != null ? r.duration_ms + "ms" : "-"}</td>
         <td>${fmtTime(r.started_at)}</td>
-        <td>${r.error_code || "-"}</td>`;
+        <td>${r.error_code || "-"}</td>
+        <td>${fmtRetrievalStats(r.retrieval_stats)}</td>`;
       tbody.appendChild(tr);
     }
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6" class="err">${e.message || "加载失败"}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="err">${e.message || "加载失败"}</td></tr>`;
   }
 }
 
@@ -842,6 +915,19 @@ async function testModel(kind) {
 }
 
 function fmtTime(s) { return new Date(s).toLocaleString("zh-CN", { hour12: false }); }
+
+// fmtRetrievalStats 把运行记录的检索通道统计渲染为紧凑文本；
+// title 悬浮可见完整 JSON（含降级原因）。数据缺失时显示 "-"。
+function fmtRetrievalStats(stats) {
+  if (!stats || !stats.length) return "-";
+  const parts = stats.map((s) => {
+    let t = `${CHANNEL_LABEL[s.channel] || s.channel} ${s.candidates}条/${s.duration_ms}ms`;
+    if (s.degrade_reason) t += "（降级）";
+    return t;
+  });
+  const text = parts.join(" · ");
+  return `<span class="meta" title="${JSON.stringify(stats).replace(/"/g, "&quot;")}">${text}</span>`;
+}
 
 loadQuestions(); loadExams(); loadKBs(); loadApps(); loadModels(); loadAudit();
 </script>
