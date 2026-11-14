@@ -455,11 +455,22 @@ async function deleteExam(id) {
   if (!confirm("确认删除该草稿？")) return;
   try { await api("DELETE", `/api/exam/exams/${id}`); loadExams(); } catch (e) { alert(e.message); }
 }
+let resultsTimer = null;
+
 async function showResults(id, title) {
   window.currentResultsExam = id;
+  window.currentResultsTitle = title;
   document.getElementById("resultsExamTitle").textContent = title;
   document.getElementById("resultsBox").classList.remove("hidden");
   const d = await api("GET", `/api/exam/exams/${id}/results`);
+  // 成绩面板 10 秒自动刷新（考试进行中观察作答状态）；不可见时跳过。
+  if (!resultsTimer) {
+    resultsTimer = setInterval(() => {
+      if (document.getElementById("resultsBox").classList.contains("hidden")) return;
+      if (document.hidden) return;
+      showResults(window.currentResultsExam, window.currentResultsTitle);
+    }, 10000);
+  }
   const tbody = document.querySelector("#rTable tbody");
   tbody.innerHTML = "";
   for (const r of d.results) {

@@ -48,6 +48,7 @@
     <div class="row" style="margin-top:12px">
       <input id="q" placeholder="输入你的问题，例如：什么是检索增强生成？" onkeydown="if(event.key==='Enter')ask()">
       <button class="act" id="askBtn" onclick="ask()">发送</button>
+      <button class="act gray hidden" id="stopBtn" onclick="stopGeneration()">停止</button>
     </div>
     <div class="meta" id="chatMsg" style="margin-top:8px">回答依据服务端授权检索的知识库生成，引用见上方标注。</div>
   </div>
@@ -74,6 +75,7 @@ async function api(method, path) {
 
 let conversationId = "";
 let apps = [];
+let currentAbort = null;
 
 // 会话按应用持久化：刷新页面后继续同一会话上下文。
 function convKey() { return "conv_" + document.getElementById("appSel").value; }
@@ -181,9 +183,14 @@ async function ask() {
   btn.disabled = true;
   addMsg("user", question);
   const out = addMsg("assistant", "（生成中...）");
+  const stopBtn = document.getElementById("stopBtn");
+  currentAbort = new AbortController();
+  stopBtn.classList.remove("hidden");
+  const stopBtnText = stopBtn.textContent;
   try {
     const r = await fetch(`/api/apps/${document.getElementById("appSel").value}/run`, {
       method: "POST", headers: headers(),
+      signal: currentAbort.signal,
       body: JSON.stringify({ question, conversation_id: conversationId }) });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -217,10 +224,21 @@ async function ask() {
     }
     if (first) out.textContent = "（无输出内容）";
   } catch (e) {
-    out.textContent = "网络错误: " + (e.message || "请稍后重试");
+    if (e.name === "AbortError") {
+      out.textContent += "\n[已停止生成]";
+    } else {
+      out.textContent = "网络错误: " + (e.message || "请稍后重试");
+    }
   } finally {
     btn.disabled = false;
+    stopBtn.classList.add("hidden");
+    stopBtn.textContent = stopBtnText;
+    currentAbort = null;
   }
+}
+
+function stopGeneration() {
+  if (currentAbort) currentAbort.abort();
 }
 
 loadApps().then(onAppChange);
