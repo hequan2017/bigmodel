@@ -785,3 +785,35 @@ func (s *Service) ListRuns(ctx context.Context, userID int64, isAdmin bool, appI
 	}
 	return out, rows.Err()
 }
+
+// ConversationSummary 是学生本人会话列表项（最近优先）。
+type ConversationSummary struct {
+	ConversationID string    `json:"conversation_id"`
+	MessageCount   int       `json:"message_count"`
+	LastAt         time.Time `json:"last_at"`
+}
+
+// ListConversations 返回本人某应用的会话列表（按最近消息时间倒序）。
+// 未提供或无会话返回空列表，不泄露他人会话。
+func (s *Service) ListConversations(ctx context.Context, userID, appID int64) ([]ConversationSummary, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT conversation_id, count(*) AS messages, max(created_at) AS last_at
+		FROM app_messages
+		WHERE app_id = $1 AND user_id = $2
+		GROUP BY conversation_id
+		ORDER BY last_at DESC`, appID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("查询会话列表: %w", err)
+	}
+	defer rows.Close()
+
+	out := []ConversationSummary{}
+	for rows.Next() {
+		var c ConversationSummary
+		if err := rows.Scan(&c.ConversationID, &c.MessageCount, &c.LastAt); err != nil {
+			return nil, fmt.Errorf("读取会话: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}

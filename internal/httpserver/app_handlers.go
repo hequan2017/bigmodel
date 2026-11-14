@@ -328,3 +328,20 @@ func (s *Server) handleAppRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"runs": runs})
 }
+
+// handleAppConversations 学生本人会话列表（多会话管理）。
+func (s *Server) handleAppConversations(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	appID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "应用 ID 非法")
+		return
+	}
+	conversations, err := s.apps.ListConversations(r.Context(), current.ID, appID)
+	if err != nil {
+		s.log.Error("查询会话列表失败", "error", err)
+		api.WriteError(w, r, http.StatusInternalServerError, "internal_error", "查询会话列表失败")
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"conversations": conversations})
+}

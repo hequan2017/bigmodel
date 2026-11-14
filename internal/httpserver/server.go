@@ -80,6 +80,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("DELETE /api/apps/{id}", s.requireAuth(s.requireRole(s.handleDisableApp, kbRoles...)))
 	mux.HandleFunc("POST /api/apps/{id}/run", s.requireAuth(s.handleRunApp))
 	mux.HandleFunc("GET /api/apps/{id}/messages", s.requireAuth(s.handleAppMessages))
+	mux.HandleFunc("GET /api/apps/{id}/conversations", s.requireAuth(s.handleAppConversations))
 	mux.HandleFunc("GET /api/apps/{id}/runs", s.requireAuth(s.requireRole(s.handleAppRuns, kbRoles...)))
 	mux.HandleFunc("GET /api/apps/{id}/kb-documents/{docID}/chunks", s.requireAuth(s.handleReferenceChunks))
 
