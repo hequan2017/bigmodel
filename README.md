@@ -90,7 +90,7 @@ go run ./cmd/server
 - [x] ① 项目骨架 / 配置加载 / 数据库迁移 / 健康检查
 - [x] ② 登录认证与 admin/teacher/student 三角色权限
 - [x] ③ 模型接入（ChatClient / EmbeddingClient 与连通性验证）
-- [ ] ④ 知识库创建与 TXT/Markdown 文档上传
+- [x] ④ 知识库创建与 TXT/Markdown 文档上传
 - [x] ⑤ 文档解析/切分/向量化 worker 与状态机
 - [x] ⑥ pgvector 向量检索与引用返回
 - [x] ⑦ Prompt 编辑与变量白名单校验
