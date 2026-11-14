@@ -180,6 +180,10 @@ curl http://127.0.0.1:18090/readyz
 模型服务通过环境变量注入（APP_CHAT_* / APP_EMBEDDING_*），可在
 `docker compose up` 前于 shell 或 .env 中设置。
 
+app 容器自带 healthcheck（wget 探测 /readyz），`docker compose ps` 可观察
+healthy 状态。多副本反向代理配置示例见 `docs/deploy/nginx-example.conf`
+（含 SSE 透传要点：proxy_buffering off 与 read_timeout 对齐）。
+
 **多副本限制（如实说明）**：文档原始文件保存在本地卷 /data，多副本部署时
 "领取任务的副本写文件、其他副本读不到"——扩展到多副本前必须先把本地卷替换为
 共享存储或对象存储（§6.2/§16.2）。当前镜像与 compose 为单实例部署形态。

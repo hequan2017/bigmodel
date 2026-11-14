@@ -40,6 +40,12 @@ services:
       - "18090:8080"
     volumes:
       - app_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/readyz | grep -q ready || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
 volumes:
