@@ -1,0 +1,26 @@
+{
+  "description": "演示知识库检索评测集（§7.5）：20 条有依据问题，expected_document 为答案所在演示资料。当前 mock 上游下命中率无参考意义，接入真实 Embedding 模型后运行方为有效。",
+  "expected_top_k": 2,
+  "cases": [
+    {"question": "大语言模型训练的三个阶段分别是什么？哪个成本最高？", "expected_document": "01-人工智能基础.md"},
+    {"question": "模型输出不够确定、太随机，应该调哪个参数？", "expected_document": "01-人工智能基础.md"},
+    {"question": "什么是大模型的幻觉？", "expected_document": "01-人工智能基础.md"},
+    {"question": "推理服务负责什么工作？", "expected_document": "01-人工智能基础.md"},
+    {"question": "微调的效果应该怎么评估？", "expected_document": "01-人工智能基础.md"},
+    {"question": "为什么需要检索增强生成？", "expected_document": "02-检索增强生成RAG入门.md"},
+    {"question": "RAG 的基本流程有哪几步？", "expected_document": "02-检索增强生成RAG入门.md"},
+    {"question": "文档切分粒度对效果有什么影响？", "expected_document": "02-检索增强生成RAG入门.md"},
+    {"question": "RAG 回答的引用应该如何处理？", "expected_document": "02-检索增强生成RAG入门.md"},
+    {"question": "检索不到相关资料时系统应该怎么做？", "expected_document": "02-检索增强生成RAG入门.md"},
+    {"question": "一个完整的提示词通常包含哪些部分？", "expected_document": "03-提示词工程实践.md"},
+    {"question": "提示词平台允许使用哪些变量？", "expected_document": "03-提示词工程实践.md"},
+    {"question": "无法回答时提示词应该怎么设定？", "expected_document": "03-提示词工程实践.md"},
+    {"question": "什么是提示词注入？如何防御？", "expected_document": "03-提示词工程实践.md"},
+    {"question": "提示词改动后如何判断效果变好还是变差？", "expected_document": "03-提示词工程实践.md"},
+    {"question": "平台预置了哪三种角色？", "expected_document": "04-大模型应用安全与权限.md"},
+    {"question": "教师访问其他教师的资源会看到什么？", "expected_document": "04-大模型应用安全与权限.md"},
+    {"question": "考试截止时间是怎么计算的？", "expected_document": "04-大模型应用安全与权限.md"},
+    {"question": "学生修改本机时钟能延长考试时间吗？", "expected_document": "04-大模型应用安全与权限.md"},
+    {"question": "平台审计事件记录了哪些信息？", "expected_document": "04-大模型应用安全与权限.md"}
+  ]
+}
