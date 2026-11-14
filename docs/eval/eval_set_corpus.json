@@ -1,0 +1,17 @@
+{
+  "description": "引用定位正确性评测集：基于真实仓库文档（计划文档/README/API/交付说明）命题，多片段语料，expected_heading 断言 Top-1 引用片段落在期望章节。命题依据为文档正文实际内容，人工确认。",
+  "cases": [
+    {"question": "审计事件至少记录哪些字段？", "expected_document": "Go大模型应用开发平台_两天开发计划与模块设计.md", "expected_heading": "4.4"},
+    {"question": "文档处理状态机有哪些状态？", "expected_document": "Go大模型应用开发平台_两天开发计划与模块设计.md", "expected_heading": "6.3"},
+    {"question": "外部模型调用能否放在数据库事务内部？", "expected_document": "Go大模型应用开发平台_两天开发计划与模块设计.md", "expected_heading": "6.3"},
+    {"question": "RRF 和 Rerank 各自是什么角色？", "expected_document": "Go大模型应用开发平台_两天开发计划与模块设计.md", "expected_heading": "7.4"},
+    {"question": "问答对匹配通道返回什么证据？", "expected_document": "Go大模型应用开发平台_两天开发计划与模块设计.md", "expected_heading": "7.4"},
+    {"question": "关键词包含查询为什么不能称为完整中文全文检索？", "expected_document": "Go大模型应用开发平台_两天开发计划与模块设计.md", "expected_heading": "7.4"},
+    {"question": "容量压测的三阶段分别是什么？", "expected_document": "README.md", "expected_heading": "容量压测"},
+    {"question": "同时交卷含判分的 p99 延迟是多少？", "expected_document": "README.md", "expected_heading": "容量压测"},
+    {"question": "压测遗留数据如何清理？", "expected_document": "README.md", "expected_heading": "容量压测"},
+    {"question": "越权访问返回什么状态码？", "expected_document": "API.md", "expected_heading": "错误码"},
+    {"question": "答案版本冲突的错误码是什么？", "expected_document": "API.md", "expected_heading": "错误码"},
+    {"question": "本期已知限制里单实例指什么？", "expected_document": "DELIVERY.md", "expected_heading": "已知限制"}
+  ]
+}

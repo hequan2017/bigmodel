@@ -422,7 +422,7 @@ func (s *Service) ReindexFullText(ctx context.Context, userID int64, isAdmin boo
 		return 0, err
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.content
+		SELECT c.id, c.content, c.heading
 		FROM document_chunks c
 		JOIN documents d ON d.id = c.document_id
 		WHERE d.knowledge_base_id = $1`, kbID)
@@ -451,12 +451,13 @@ func (s *Service) ReindexFullText(ctx context.Context, userID int64, isAdmin boo
 	}
 	for rows.Next() {
 		var id int64
-		var content string
-		if err := rows.Scan(&id, &content); err != nil {
+		var content, heading string
+		if err := rows.Scan(&id, &content, &heading); err != nil {
 			return 0, fmt.Errorf("扫描片段: %w", err)
 		}
 		ids = append(ids, id)
-		texts = append(texts, SegmentText(content))
+		// 与 worker 写入保持一致：标题词并入索引。
+		texts = append(texts, SegmentText(heading+"\n"+content))
 		if len(ids) >= batch {
 			if err := flush(); err != nil {
 				return 0, err
