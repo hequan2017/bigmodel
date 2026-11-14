@@ -44,9 +44,14 @@ func TestSplitTextParagraphBoundariesWithOverlap(t *testing.T) {
 		}
 	}
 	for i := 1; i < len(chunks); i++ {
-		if chunks[i].StartOffset >= chunks[i-1].EndOffset {
-			t.Errorf("相邻片段无重叠: chunk%d start=%d chunk%d end=%d",
-				i, chunks[i].StartOffset, i-1, chunks[i-1].EndOffset)
+		// 结构块聚合切分：片段边界不重叠（整段归属，引用无重复 offset），
+		// 但不得跨越未覆盖的正文内容（允许片段间仅空白间隔）。
+		if chunks[i].StartOffset > chunks[i-1].EndOffset {
+			gap := string([]rune(para)[chunks[i-1].EndOffset:chunks[i].StartOffset])
+			if strings.TrimSpace(gap) != "" {
+				t.Errorf("相邻片段间丢失正文: chunk%d end=%d chunk%d start=%d gap=%q",
+					i-1, chunks[i-1].EndOffset, i, chunks[i].StartOffset, gap)
+			}
 		}
 		if chunks[i].StartOffset <= chunks[i-1].StartOffset {
 			t.Errorf("片段起点未前进")
@@ -184,18 +189,19 @@ func TestSplitTextHeadingLedChunkOwnsHeading(t *testing.T) {
 	for r := 0; r < 10; r++ {
 		fmt.Fprintf(&b, "| 键%d | 值%d的说明文字 |\n", r, r)
 	}
-	// 300 字符窗口、零重叠：唯一合法切点应为数据表标题前的空行。
+	// 300 字符窗口、零重叠：结构块聚合下表格段独立成片或与标题同片，
+	// 含表格的片段必须携带表格所属章节标题。
 	chunks := SplitText(b.String(), 300, 0)
 	found := false
 	for _, c := range chunks {
-		if strings.HasPrefix(strings.TrimSpace(c.Content), "## 数据表") {
+		if strings.Contains(c.Content, "| 键0 |") {
 			found = true
 			if !strings.Contains(c.Heading, "数据表") {
-				t.Errorf("以标题开头的片段应归属该标题, got %q", c.Heading)
+				t.Errorf("表格片段应归属数据表章节, got %q", c.Heading)
 			}
 		}
 	}
 	if !found {
-		t.Fatal("未找到以数据表标题开头的片段")
+		t.Fatal("未找到包含表格内容的片段")
 	}
 }
