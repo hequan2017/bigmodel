@@ -124,6 +124,20 @@ SCORE=$(curl -s --noproxy '*' "$BASE/api/exam/exams/$EXAM/attempts/result" -H "$
   | jqpy 'd["result"]["total_score"]')
 check "判分正确（全对 10 分）" "$SCORE" "10"
 
+# ---------- 问答多会话管理（列表 + 删除） ----------
+CONVS=$(curl -s --noproxy '*' "$BASE/api/apps/$APP/conversations" -H "$AH_S")
+CONV_COUNT=$(echo "$CONVS" | jqpy 'len(d["conversations"])')
+[ "$CONV_COUNT" -ge 1 ] 2>/dev/null && pass "会话列表返回（${CONV_COUNT} 个会话）" || fail "会话列表返回"
+DEL_CONV=$(echo "$CONVS" | jqpy 'd["conversations"][0]["conversation_id"]')
+if [ -n "$DEL_CONV" ]; then
+  CODE=$(curl -s --noproxy '*' -o /dev/null -w '%{http_code}' -X DELETE \
+    "$BASE/api/apps/$APP/conversations/$DEL_CONV" -H "$AH_S")
+  check "删除会话" "$CODE" "200"
+  AFTER=$(curl -s --noproxy '*' "$BASE/api/apps/$APP/conversations" -H "$AH_S" \
+    | jqpy 'len(d["conversations"])')
+  check "删除后列表刷新" "$AFTER" "$((CONV_COUNT-1))"
+fi
+
 # ---------- 汇总 ----------
 echo "================================"
 echo "冒烟回归完成：PASS ${PASS} / FAIL ${FAIL}"
