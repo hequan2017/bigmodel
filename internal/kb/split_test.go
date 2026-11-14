@@ -1,6 +1,7 @@
 package kb
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -19,8 +20,9 @@ func TestSplitTextShortSingleChunk(t *testing.T) {
 	if c.StartOffset != 0 || c.EndOffset != len([]rune(text)) {
 		t.Errorf("offset 错误: [%d,%d)", c.StartOffset, c.EndOffset)
 	}
-	if c.Heading != "" {
-		t.Errorf("首片段不应有前置标题: %q", c.Heading)
+	// 片段以自身标题行开头时，Heading 归属该标题（章节归属修正）。
+	if c.Heading != "# 标题" {
+		t.Errorf("片段应以自带标题为所属章节: %q", c.Heading)
 	}
 }
 
@@ -116,5 +118,84 @@ func TestSplitTextOffsetsMapToOriginal(t *testing.T) {
 			t.Errorf("offset 无法还原片段: [%d,%d) %q vs %q",
 				c.StartOffset, c.EndOffset, string(rs[c.StartOffset:c.EndOffset]), c.Content)
 		}
+	}
+}
+
+func TestSplitTextTableNotSplitAcrossChunks(t *testing.T) {
+	// 表格整体可容纳于一个片段时不得被拆散（对应评测发现的错误码表格拆散问题）：
+	// 前置章节把表格推过常规窗口后，扩展窗口应把切点回退到表格之前的空行。
+	var b strings.Builder
+	for i := 0; i < 18; i++ {
+		fmt.Fprintf(&b, "前置章节内容第%d行，用于把表格推入切分窗口边界。这是一段较长的铺垫文字。\n", i)
+	}
+	b.WriteString("\n## 数据表\n\n")
+	for r := 0; r < 12; r++ {
+		fmt.Fprintf(&b, "| 键%d | 值%d的说明文字，补充表格行长度 | 备注%d |\n", r, r, r)
+	}
+	chunks := SplitText(b.String(), 600, 100)
+	if len(chunks) < 2 {
+		t.Fatalf("应切出多片段, got %d", len(chunks))
+	}
+	for k := 1; k < len(chunks); k++ {
+		prevLines := strings.Split(strings.TrimRight(chunks[k-1].Content, "\n"), "\n")
+		curLines := strings.Split(strings.TrimLeft(chunks[k].Content, "\n"), "\n")
+		if len(prevLines) == 0 || len(curLines) == 0 {
+			continue
+		}
+		prevLast := strings.TrimSpace(prevLines[len(prevLines)-1])
+		curFirst := strings.TrimSpace(curLines[0])
+		if strings.HasPrefix(prevLast, "|") && strings.HasPrefix(curFirst, "|") {
+			t.Errorf("表格行被切分拆散：片段 %d 尾行 %q 与片段 %d 首行 %q",
+				k-1, prevLast, k, curFirst)
+		}
+	}
+}
+
+func TestSplitTextHeadingNeverTailsChunk(t *testing.T) {
+	// 段落边界落在标题行之后时，标题不得成为上一片段的尾行。
+	var b strings.Builder
+	for i := 0; i < 14; i++ {
+		fmt.Fprintf(&b, "正文段落第%d行，持续填充使窗口接近目标长度，便于触发边界切分。\n", i)
+	}
+	b.WriteString("\n## 新章节标题\n\n新章节的正文内容从这里开始，需要足够长以构成独立片段。\n")
+	chunks := SplitText(b.String(), 600, 100)
+	for k, c := range chunks {
+		lines := strings.Split(strings.TrimRight(c.Content, "\n"), "\n")
+		if len(lines) == 0 {
+			continue
+		}
+		last := strings.TrimSpace(lines[len(lines)-1])
+		if strings.HasPrefix(last, "#") {
+			t.Errorf("片段 %d 以标题行结尾：%q", k, last)
+		}
+	}
+}
+
+func TestSplitTextHeadingLedChunkOwnsHeading(t *testing.T) {
+	// 切点落在标题前空行时，新片段以标题开头且 Heading 归属该标题
+	// （而非上一个章节），headingBefore 只能看到前一个章节。
+	// 标题后接表格行（行间禁切、标题后不可切），使标题前空行成为
+	// 窗口内唯一合法切点，场景确定。
+	var b strings.Builder
+	for i := 0; i < 9; i++ {
+		fmt.Fprintf(&b, "甲章节正文第%d行，无空行的连续正文，把窗口推近目标长度。\n", i)
+	}
+	b.WriteString("\n## 数据表\n\n")
+	for r := 0; r < 10; r++ {
+		fmt.Fprintf(&b, "| 键%d | 值%d的说明文字 |\n", r, r)
+	}
+	// 300 字符窗口、零重叠：唯一合法切点应为数据表标题前的空行。
+	chunks := SplitText(b.String(), 300, 0)
+	found := false
+	for _, c := range chunks {
+		if strings.HasPrefix(strings.TrimSpace(c.Content), "## 数据表") {
+			found = true
+			if !strings.Contains(c.Heading, "数据表") {
+				t.Errorf("以标题开头的片段应归属该标题, got %q", c.Heading)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("未找到以数据表标题开头的片段")
 	}
 }
