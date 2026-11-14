@@ -1,6 +1,6 @@
 -- 002：会话表 —— 支持登录认证与登出。
 
-CREATE TABLE IF NOT EXISTS user_sessions (
+CREATE TABLE user_sessions (
     id         BIGSERIAL PRIMARY KEY,
     user_id    BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash TEXT        NOT NULL UNIQUE,

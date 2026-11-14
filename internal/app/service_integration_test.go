@@ -80,15 +80,21 @@ func newTestEnv(t *testing.T) (*Service, *kb.Service, *pgxpool.Pool) {
 	if err := database.EnsureSchema(ctx, cfg, schema); err != nil {
 		t.Skipf("创建测试 schema 失败: %v", err)
 	}
-	pool, err := database.ConnectWithSchema(ctx, cfg, schema)
+	migPool, err := database.ConnectWithSchema(ctx, cfg, schema, false)
+	if err != nil {
+		_ = database.DropSchema(ctx, cfg, schema)
+		t.Skipf("连接迁移 schema 失败: %v", err)
+	}
+	if err := database.Migrate(ctx, migPool); err != nil {
+		migPool.Close()
+		_ = database.DropSchema(ctx, cfg, schema)
+		t.Skipf("测试 schema 迁移失败: %v", err)
+	}
+	migPool.Close()
+	pool, err := database.ConnectWithSchema(ctx, cfg, schema, true)
 	if err != nil {
 		_ = database.DropSchema(ctx, cfg, schema)
 		t.Skipf("连接测试 schema 失败: %v", err)
-	}
-	if err := database.Migrate(ctx, pool); err != nil {
-		pool.Close()
-		_ = database.DropSchema(ctx, cfg, schema)
-		t.Skipf("测试 schema 迁移失败: %v", err)
 	}
 	t.Cleanup(func() {
 		pool.Close()
@@ -162,6 +168,12 @@ func TestAppLifecycleAndRunIntegration(t *testing.T) {
 	studentID := createStudent(t, pool, "itest_a_stu_"+suffix)
 
 	embed := &fakeEmbedder{dim: 4}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO model_profiles (name, kind, model_name, base_url, credential_ref)
+		VALUES ($1, 'embedding', 'itest-model', 'http://127.0.0.1:1', 'ITEST')`,
+		"itest-app-emb-"+suffix); err != nil {
+		t.Fatalf("创建测试档案: %v", err)
+	}
 	kbRow, err := kbSvc.CreateKB(ctx, teacherID, "应用测试库", "")
 	if err != nil {
 		t.Fatalf("创建知识库: %v", err)
@@ -305,7 +317,13 @@ func TestAppLifecycleAndRunIntegration(t *testing.T) {
 		t.Errorf("调试运行未使用草稿 Prompt: %q", chat.lastPrompt)
 	}
 
-	// 停用：学生不可见（404），教师不可运行（409）。
+	// 再次发布（基于新草稿）→ revision 2。
+	published, err = svc.Publish(ctx, teacherID, "teacher", false, a.ID)
+	if err != nil || published.PublishedRevision != 2 {
+		t.Fatalf("再次发布: err=%v", err)
+	}
+
+	// 停用：学生不可见（404），教师不可运行（409），不可再发布（409）。
 	if err := svc.Disable(ctx, teacherID, "teacher", false, a.ID); err != nil {
 		t.Fatalf("停用: %v", err)
 	}
@@ -319,11 +337,8 @@ func TestAppLifecycleAndRunIntegration(t *testing.T) {
 	if !errors.Is(err, ErrNotRunnable) {
 		t.Errorf("停用后教师运行应 ErrNotRunnable, got %v", err)
 	}
-
-	// 再次发布（基于新草稿）→ revision 2。
-	published, err = svc.Publish(ctx, teacherID, "teacher", false, a.ID)
-	if err != nil || published.PublishedRevision != 2 {
-		t.Errorf("再次发布: rev=%d err=%v", published.PublishedRevision, err)
+	if _, err := svc.Publish(ctx, teacherID, "teacher", false, a.ID); !errors.Is(err, ErrInvalidState) {
+		t.Errorf("停用后发布应 ErrInvalidState, got %v", err)
 	}
 }
 
@@ -334,6 +349,13 @@ func TestAppRunFailureAndCancelIntegration(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	teacherID := createAppTestUser(t, pool, "itest_b_"+suffix)
 	embed := &fakeEmbedder{dim: 4}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO model_profiles (name, kind, model_name, base_url, credential_ref)
+		VALUES ($1, 'embedding', 'itest-model', 'http://127.0.0.1:1', 'ITEST')`,
+		"itest-app-emb-b-"+suffix); err != nil {
+		t.Fatalf("创建测试档案: %v", err)
+	}
 
 	kbRow, err := kbSvc.CreateKB(ctx, teacherID, "失败测试库", "")
 	if err != nil {

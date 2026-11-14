@@ -1,6 +1,6 @@
 -- 004：知识库与文档。文档处理状态机由后台 worker 推进（后续功能接入）。
 
-CREATE TABLE IF NOT EXISTS knowledge_bases (
+CREATE TABLE knowledge_bases (
     id                  BIGSERIAL PRIMARY KEY,
     owner_id            BIGINT      NOT NULL REFERENCES users(id),
     name                TEXT        NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
 
 COMMENT ON TABLE knowledge_bases IS '知识库：固定绑定一个 Embedding 模型与维度';
 
-CREATE TABLE IF NOT EXISTS documents (
+CREATE TABLE documents (
     id                BIGSERIAL PRIMARY KEY,
     knowledge_base_id BIGINT      NOT NULL REFERENCES knowledge_bases(id) ON DELETE CASCADE,
     file_path         TEXT        NOT NULL DEFAULT '',

@@ -49,6 +49,7 @@ internal/model      Chat/Embedding 适配器与模型档案
 internal/kb         知识库、文档上传校验、切分与处理 worker
 internal/prompt     Prompt 模板校验与白名单渲染
 internal/app        问答应用草稿/发布与 SSE 流式运行
+internal/exam       等级考试后台：题库、组卷、作答与判分
 internal/httpserver 路由、中间件与健康检查
 migrations          内嵌 SQL 迁移（启动时自动按序执行）
 ```
@@ -94,7 +95,7 @@ go run ./cmd/server
 - [x] ⑥ pgvector 向量检索与引用返回
 - [x] ⑦ Prompt 编辑与变量白名单校验
 - [x] ⑧ 问答应用草稿/发布与 SSE 流式问答
-- [ ] ⑨ 考试题库（单选/判断）
+- [x] ⑨ 考试题库（单选/判断）
 - [ ] ⑩ 组卷与发布快照
 - [ ] ⑪ 开始考试、自动保存与版本冲突控制
 - [ ] ⑫ 交卷判分与到期自动结算

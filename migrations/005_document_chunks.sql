@@ -2,7 +2,7 @@
 -- 维度一致性由应用层校验（同一知识库内所有片段与查询向量同维）；
 -- 后续引入近似索引时再按实际维度迁移为 vector(D)。
 
-CREATE TABLE IF NOT EXISTS document_chunks (
+CREATE TABLE document_chunks (
     id              BIGSERIAL PRIMARY KEY,
     document_id     BIGINT      NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index     INTEGER     NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     start_offset    INTEGER     NOT NULL,
     end_offset      INTEGER     NOT NULL,
     heading         TEXT        NOT NULL DEFAULT '',
-    embedding       vector      NOT NULL,
+    embedding       public.vector NOT NULL,
     embedding_model TEXT        NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (document_id, chunk_index)

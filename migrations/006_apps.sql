@@ -1,6 +1,6 @@
 -- 006：问答应用与运行记录。发布快照与草稿分离；运行记录含会话历史。
 
-CREATE TABLE IF NOT EXISTS apps (
+CREATE TABLE apps (
     id                 BIGSERIAL PRIMARY KEY,
     owner_id           BIGINT      NOT NULL REFERENCES users(id),
     name               TEXT        NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS apps (
 
 COMMENT ON TABLE apps IS '教育问答应用：草稿与发布快照分离，发布后改草稿不影响已发布版本';
 
-CREATE TABLE IF NOT EXISTS app_runs (
+CREATE TABLE app_runs (
     id              BIGSERIAL PRIMARY KEY,
     app_id          BIGINT      NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
     revision        INTEGER     NOT NULL DEFAULT 0,
@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_app_runs_conversation
 
 COMMENT ON TABLE app_runs IS '应用运行记录：revision 记录所用配置快照版本，debug 模式 revision 为 0';
 
-CREATE TABLE IF NOT EXISTS app_messages (
+CREATE TABLE app_messages (
     id              BIGSERIAL PRIMARY KEY,
     run_id          BIGINT      NOT NULL REFERENCES app_runs(id) ON DELETE CASCADE,
     app_id          BIGINT      NOT NULL,

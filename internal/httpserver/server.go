@@ -14,6 +14,7 @@ import (
 	"github.com/hequan2017/bigmodel/internal/app"
 	"github.com/hequan2017/bigmodel/internal/auth"
 	"github.com/hequan2017/bigmodel/internal/config"
+	"github.com/hequan2017/bigmodel/internal/exam"
 	"github.com/hequan2017/bigmodel/internal/kb"
 	"github.com/hequan2017/bigmodel/internal/model"
 )
@@ -26,6 +27,7 @@ type Server struct {
 	models *model.Service
 	kb     *kb.Service
 	apps   *app.Service
+	exam   *exam.Service
 	log    *slog.Logger
 	http   *http.Server
 }
@@ -35,6 +37,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	s := &Server{cfg: cfg, pool: pool, log: log, models: models, kb: kbSvc}
 	s.auth = auth.NewService(pool, cfg.SessionTTL)
 	s.apps = app.NewService(pool, s.kb)
+	s.exam = exam.NewService(pool)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleLiveness)
@@ -65,6 +68,12 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/apps/{id}/publish", s.requireAuth(s.requireRole(s.handlePublishApp, kbRoles...)))
 	mux.HandleFunc("DELETE /api/apps/{id}", s.requireAuth(s.requireRole(s.handleDisableApp, kbRoles...)))
 	mux.HandleFunc("POST /api/apps/{id}/run", s.requireAuth(s.handleRunApp))
+
+	mux.HandleFunc("POST /api/exam/questions", s.requireAuth(s.requireRole(s.handleCreateQuestion, kbRoles...)))
+	mux.HandleFunc("GET /api/exam/questions", s.requireAuth(s.requireRole(s.handleListQuestions, kbRoles...)))
+	mux.HandleFunc("GET /api/exam/questions/{id}", s.requireAuth(s.requireRole(s.handleGetQuestion, kbRoles...)))
+	mux.HandleFunc("PUT /api/exam/questions/{id}", s.requireAuth(s.requireRole(s.handleUpdateQuestion, kbRoles...)))
+	mux.HandleFunc("DELETE /api/exam/questions/{id}", s.requireAuth(s.requireRole(s.handleDisableQuestion, kbRoles...)))
 
 	mux.HandleFunc("/", s.handleNotFound)
 

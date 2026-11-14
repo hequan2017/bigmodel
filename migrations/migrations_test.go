@@ -25,10 +25,10 @@ func TestAllSortedWithInit(t *testing.T) {
 	if !strings.Contains(first.SQL, "CREATE EXTENSION IF NOT EXISTS vector") {
 		t.Error("首个迁移应启用 pgvector 扩展")
 	}
-	if !strings.Contains(first.SQL, "CREATE TABLE IF NOT EXISTS users") {
+	if !strings.Contains(first.SQL, "CREATE TABLE users") {
 		t.Error("首个迁移应包含 users 表")
 	}
-	if !strings.Contains(first.SQL, "CREATE TABLE IF NOT EXISTS audit_events") {
+	if !strings.Contains(first.SQL, "CREATE TABLE audit_events") {
 		t.Error("首个迁移应包含 audit_events 表")
 	}
 }

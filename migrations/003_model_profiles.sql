@@ -1,6 +1,6 @@
 -- 003：模型接入配置档案。端点与凭据引用来自部署配置，密钥正文不落库。
 
-CREATE TABLE IF NOT EXISTS model_profiles (
+CREATE TABLE model_profiles (
     id                  BIGSERIAL PRIMARY KEY,
     name                TEXT        NOT NULL UNIQUE,
     kind                TEXT        NOT NULL CHECK (kind IN ('chat', 'embedding')),

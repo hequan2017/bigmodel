@@ -3,7 +3,7 @@
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id            BIGSERIAL PRIMARY KEY,
     login_name    TEXT        NOT NULL UNIQUE,
     password_hash TEXT        NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 COMMENT ON TABLE users IS '平台用户：本期由初始化脚本创建，不提供注册';
 
-CREATE TABLE IF NOT EXISTS audit_events (
+CREATE TABLE audit_events (
     event_id      BIGSERIAL PRIMARY KEY,
     actor_id      BIGINT,
     action        TEXT        NOT NULL,

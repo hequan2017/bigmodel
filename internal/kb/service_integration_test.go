@@ -26,23 +26,37 @@ func newTestService(t *testing.T) (*Service, *pgxpool.Pool) {
 		t.Skipf("配置不可用，跳过集成测试: %v", err)
 	}
 	ctx := context.Background()
-	if err := database.EnsureSchema(ctx, cfg, testSchemaName(t)); err != nil {
+	schema := testSchemaName(t)
+	if err := database.EnsureSchema(ctx, cfg, schema); err != nil {
 		t.Skipf("创建测试 schema 失败: %v", err)
 	}
-	pool, err := database.ConnectWithSchema(ctx, cfg, testSchemaName(t))
+	migPool, err := database.ConnectWithSchema(ctx, cfg, schema, false)
 	if err != nil {
-		_ = database.DropSchema(ctx, cfg, testSchemaName(t))
-		t.Skipf("连接测试 schema 失败: %v", err)
+		_ = database.DropSchema(ctx, cfg, schema)
+		t.Skipf("连接迁移 schema 失败: %v", err)
 	}
-	if err := database.Migrate(ctx, pool); err != nil {
-		pool.Close()
-		_ = database.DropSchema(ctx, cfg, testSchemaName(t))
+	if err := database.Migrate(ctx, migPool); err != nil {
+		migPool.Close()
+		_ = database.DropSchema(ctx, cfg, schema)
 		t.Skipf("测试 schema 迁移失败: %v", err)
+	}
+	migPool.Close()
+	pool, err := database.ConnectWithSchema(ctx, cfg, schema, true)
+	if err != nil {
+		_ = database.DropSchema(ctx, cfg, schema)
+		t.Skipf("连接测试 schema 失败: %v", err)
 	}
 	t.Cleanup(func() {
 		pool.Close()
-		_ = database.DropSchema(ctx, cfg, testSchemaName(t))
+		_ = database.DropSchema(ctx, cfg, schema)
 	})
+	// 测试 schema 是全新库：预置一个可用的 Embedding 档案供建库绑定。
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO model_profiles (name, kind, model_name, base_url, credential_ref)
+		VALUES ($1, 'embedding', 'itest-model', 'http://127.0.0.1:1', 'ITEST')`,
+		"itest-default-emb-"+schema); err != nil {
+		t.Fatalf("创建默认测试档案: %v", err)
+	}
 	return NewService(pool, t.TempDir()), pool
 }
 

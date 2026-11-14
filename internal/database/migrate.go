@@ -11,6 +11,8 @@ import (
 
 // Migrate 执行所有未应用的迁移；每个迁移独立事务，避免留下半成品 Schema。
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	// schema_migrations 使用 IF NOT EXISTS：业务表由版本记录保证只建一次，
+	// 而此表本身需要在重复启动（含测试 schema 切换）时幂等存在。
 	if _, err := pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version    TEXT PRIMARY KEY,

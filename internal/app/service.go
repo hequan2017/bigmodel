@@ -423,10 +423,13 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 		return fmt.Errorf("创建运行记录: %w", err)
 	}
 
+	// 运行状态落库不依赖请求 ctx：客户端取消后仍需正确写入终态。
+	markCtx := context.WithoutCancel(ctx)
+
 	if err := emit(Event{Type: "start", Payload: map[string]any{
 		"run_id": runID, "conversation_id": conv, "revision": revision, "mode": mode,
 	}}); err != nil {
-		_ = s.markRun(ctx, runID, RunCanceled, "", 0)
+		_ = s.markRun(markCtx, runID, RunCanceled, "", 0)
 		return nil
 	}
 
@@ -437,12 +440,12 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 		kb.SearchRequest{Question: question, TopK: cfg.TopK}, p.Embed, p.EmbedModel)
 	if serr != nil {
 		code, msg := upstreamCode(serr)
-		_ = s.markRun(ctx, runID, RunFailed, code, 0)
+		_ = s.markRun(markCtx, runID, RunFailed, code, 0)
 		_ = emit(Event{Type: "error", Payload: map[string]any{"code": code, "message": msg}})
 		return nil
 	}
 	if err := emit(Event{Type: "references", Payload: map[string]any{"references": buildRefs(cands)}}); err != nil {
-		_ = s.markRun(ctx, runID, RunCanceled, "", 0)
+		_ = s.markRun(markCtx, runID, RunCanceled, "", 0)
 		return nil
 	}
 
@@ -452,7 +455,7 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 		"history":  renderHistory(history),
 	})
 	if rerr != nil {
-		_ = s.markRun(ctx, runID, RunFailed, "render_failed", 0)
+		_ = s.markRun(markCtx, runID, RunFailed, "render_failed", 0)
 		_ = emit(Event{Type: "error", Payload: map[string]any{"code": "render_failed", "message": rerr.Error()}})
 		return nil
 	}
@@ -483,7 +486,7 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 
 	switch {
 	case err == nil:
-		_ = s.markRun(ctx, runID, RunSucceeded, "", duration)
+		_ = s.markRun(markCtx, runID, RunSucceeded, "", duration)
 		_ = s.saveMessages(ctx, runID, p.AppID, p.UserID, conv, question, answer.String())
 		done := map[string]any{"status": RunSucceeded, "duration_ms": duration}
 		if usage != nil {
@@ -492,7 +495,7 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 		_ = emit(Event{Type: "done", Payload: done})
 		return nil
 	case errors.Is(err, errClientGone), errors.Is(err, context.Canceled):
-		_ = s.markRun(ctx, runID, RunCanceled, "", duration)
+		_ = s.markRun(markCtx, runID, RunCanceled, "", duration)
 		_ = emit(Event{Type: "done", Payload: map[string]any{"status": RunCanceled, "duration_ms": duration}})
 		return nil
 	default:
@@ -500,7 +503,7 @@ func (s *Service) RunApp(ctx context.Context, p RunParams, emit func(Event) erro
 		if errors.Is(err, context.DeadlineExceeded) {
 			code, msg = "upstream_timeout", "生成超时"
 		}
-		_ = s.markRun(ctx, runID, RunFailed, code, duration)
+		_ = s.markRun(markCtx, runID, RunFailed, code, duration)
 		_ = emit(Event{Type: "error", Payload: map[string]any{"code": code, "message": msg}})
 		return nil
 	}

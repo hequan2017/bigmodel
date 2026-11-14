@@ -35,14 +35,20 @@ func EnsureSchema(ctx context.Context, cfg config.Config, schema string) error {
 	return nil
 }
 
-// ConnectWithSchema 建立把 search_path 限定到指定 schema 的连接池（测试隔离用），
-// 使迁移与业务表落在独立 schema 中，不污染共享开发数据。
-func ConnectWithSchema(ctx context.Context, cfg config.Config, schema string) (*pgxpool.Pool, error) {
+// ConnectWithSchema 建立指向指定 schema 的连接池（测试隔离用）。
+// withPublic=true 时 search_path 追加 public，供运行期解析 pgvector 操作符与函数；
+// 迁移请使用 withPublic=false，保证 CREATE TABLE 落在测试 schema 内
+// （search_path 含 public 时，同名关系会干扰建表与 IF NOT EXISTS 判断）。
+func ConnectWithSchema(ctx context.Context, cfg config.Config, schema string, withPublic bool) (*pgxpool.Pool, error) {
 	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("解析数据库连接串: %w", err)
 	}
-	poolCfg.ConnConfig.RuntimeParams["search_path"] = schema
+	searchPath := schema
+	if withPublic {
+		searchPath += ", public"
+	}
+	poolCfg.ConnConfig.RuntimeParams["search_path"] = searchPath
 	return connectWithConfig(ctx, poolCfg)
 }
 
