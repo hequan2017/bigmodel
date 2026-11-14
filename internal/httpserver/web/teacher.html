@@ -181,7 +181,7 @@
       <div id="pvResult" class="hidden"></div>
     </div>
     <div class="card"><h2>应用列表</h2>
-      <table id="appTable"><thead><tr><th>ID</th><th>名称</th><th>状态</th><th>版本</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="appTable"><thead><tr><th>ID</th><th>名称</th><th>状态</th><th>版本</th><th>发布配置</th><th></th></tr></thead><tbody></tbody></table>
     </div>
     <div class="card hidden" id="debugBox">
       <h3>调试：<span id="debugAppName"></span>（按草稿配置运行）</h3>
@@ -578,9 +578,12 @@ async function loadApps() {
   window.appCache = d.apps;
   for (const a of d.apps) {
     const tr = document.createElement("tr");
+    const cfgSummary = a.published_config
+      ? `知识库#${a.published_config.knowledge_base_id} · TopK ${a.published_config.top_k}`
+      : "-";
     tr.innerHTML = `<td>${a.id}</td><td>${a.name}</td>
       <td><span class="badge ${a.status === "published" ? "ok" : "warn"}">${a.status}</span></td>
-      <td>${a.published_revision}</td>
+      <td>${a.published_revision}</td><td class="meta">${cfgSummary}</td>
       <td>${a.status !== "disabled" ? `
         <button class="act" onclick="openDebug(${a.id})">调试</button>` : ""}
         ${a.status === "draft" ? `<button class="act green" onclick="publishApp(${a.id})">发布</button>` : ""}</td>`;

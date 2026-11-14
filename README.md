@@ -14,6 +14,8 @@ docker compose up -d db
 go run ./cmd/seed
 
 # 3. 编译并运行（启动时自动执行数据库迁移）
+#   默认监听 :8080；若端口被占用（如本机已有 nginx），
+#   换端口运行：APP_HTTP_ADDR=:18080 go run ./cmd/server
 go run ./cmd/server
 
 # 4. 健康检查
