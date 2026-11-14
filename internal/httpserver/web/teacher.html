@@ -193,6 +193,22 @@
       <div id="modelList"></div>
     </div>
     <div class="card"><h2>审计事件（最近 100 条）
+      <label class="meta">动作过滤 <select id="auditFilter" onchange="loadAudit()">
+        <option value="">全部</option>
+        <option value="auth.login">auth.login</option>
+        <option value="kb.create">kb.create</option>
+        <option value="document.upload">document.upload</option>
+        <option value="document.disable">document.disable</option>
+        <option value="app.create">app.create</option>
+        <option value="app.publish">app.publish</option>
+        <option value="app.disable">app.disable</option>
+        <option value="exam.question.create">exam.question.create</option>
+        <option value="exam.create">exam.create</option>
+        <option value="exam.publish">exam.publish</option>
+        <option value="exam.submit">exam.submit</option>
+        <option value="exam.question.disable">exam.question.disable</option>
+        <option value="exam.disable">exam.disable</option>
+      </select></label>
       <button class="act gray" onclick="loadAudit()">刷新</button></h2>
       <table id="auditTable"><thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>资源</th><th>结果</th></tr></thead><tbody></tbody></table>
       <div class="meta">基础留痕查看，不宣称防篡改审计；不记录口令/令牌/密钥。</div>
@@ -680,7 +696,9 @@ async function loadAudit() {
   const tbody = document.querySelector("#auditTable tbody");
   tbody.innerHTML = "";
   try {
-    const d = await api("GET", "/api/admin/audit?limit=100");
+    const filter = document.getElementById("auditFilter").value;
+    const d = await api("GET", "/api/admin/audit?limit=100" +
+      (filter ? "&action=" + encodeURIComponent(filter) : ""));
     for (const e of d.events) {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${fmtTime(e.created_at)}</td><td>${e.actor_name || e.actor_id || "-"}</td>

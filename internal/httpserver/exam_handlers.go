@@ -479,7 +479,7 @@ func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	events, err := audit.ListEvents(r.Context(), s.pool, limit)
+	events, err := audit.ListEvents(r.Context(), s.pool, limit, r.URL.Query().Get("action"))
 	if err != nil {
 		s.log.Error("查询审计事件失败", "error", err)
 		api.WriteError(w, r, http.StatusInternalServerError, "internal_error", "查询审计事件失败")

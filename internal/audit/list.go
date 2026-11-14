@@ -23,20 +23,27 @@ type EventView struct {
 
 // ListEvents 按时间倒序返回最近 limit 条审计事件（管理员查看用）。
 // 本实现提供基础留痕的查看能力，不宣称防篡改审计。
-func ListEvents(ctx context.Context, pool *pgxpool.Pool, limit int) ([]EventView, error) {
+func ListEvents(ctx context.Context, pool *pgxpool.Pool, limit int, actionFilter string) ([]EventView, error) {
 	if limit <= 0 {
 		limit = 50
 	}
 	if limit > 500 {
 		limit = 500
 	}
+	where := ""
+	args := []any{limit}
+	if actionFilter != "" {
+		where = "WHERE a.action = $2"
+		args = append(args, actionFilter)
+	}
 	rows, err := pool.Query(ctx, `
 		SELECT a.event_id, a.actor_id, COALESCE(u.login_name, ''),
 		       a.action, a.resource_type, a.resource_id, a.result, a.request_id, a.created_at
 		FROM audit_events a
 		LEFT JOIN users u ON u.id = a.actor_id
+		`+where+`
 		ORDER BY a.event_id DESC
-		LIMIT $1`, limit)
+		LIMIT $1`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("查询审计事件: %w", err)
 	}

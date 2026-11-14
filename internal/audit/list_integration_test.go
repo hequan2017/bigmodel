@@ -78,7 +78,7 @@ func TestListEventsIntegration(t *testing.T) {
 		})
 	}
 
-	events, err := ListEvents(ctx, pool, 100)
+	events, err := ListEvents(ctx, pool, 100, "")
 	if err != nil {
 		t.Fatalf("查询审计事件: %v", err)
 	}
@@ -94,14 +94,14 @@ func TestListEventsIntegration(t *testing.T) {
 	}
 
 	// limit 生效。
-	few, err := ListEvents(ctx, pool, 2)
+	few, err := ListEvents(ctx, pool, 2, "")
 	if err != nil || len(few) != 2 {
 		t.Errorf("limit=2 应返回 2 条: %v err=%v", few, err)
 	}
 
 	// 未知操作者（actor 为 NULL）不报错。
 	Record(ctx, pool, Entry{Action: "test.anonymous", Result: "failed"})
-	events, err = ListEvents(ctx, pool, 10)
+	events, err = ListEvents(ctx, pool, 10, "")
 	if err != nil {
 		t.Fatalf("含匿名事件查询: %v", err)
 	}
@@ -113,5 +113,28 @@ func TestListEventsIntegration(t *testing.T) {
 	}
 	if !found {
 		t.Error("匿名事件应存在且操作者为空")
+	}
+}
+
+func TestListEventsActionFilterIntegration(t *testing.T) {
+	pool, _ := newAuditTestPool(t)
+	ctx := context.Background()
+
+	var actorID int64
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO users (login_name, password_hash, role) VALUES ($1, 'x', 'teacher') RETURNING id`,
+		fmt.Sprintf("itest_filter_%d", time.Now().UnixNano()),
+	).Scan(&actorID); err != nil {
+		t.Fatalf("创建用户: %v", err)
+	}
+	Record(ctx, pool, Entry{ActorID: &actorID, Action: "filter.a", Result: "success"})
+	Record(ctx, pool, Entry{ActorID: &actorID, Action: "filter.b", Result: "success"})
+
+	events, err := ListEvents(ctx, pool, 100, "filter.a")
+	if err != nil {
+		t.Fatalf("过滤查询: %v", err)
+	}
+	if len(events) != 1 || events[0].Action != "filter.a" {
+		t.Errorf("过滤结果错误: %+v", events)
 	}
 }
