@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: bigmodel
+          POSTGRES_PASSWORD: bigmodel
+          POSTGRES_DB: bigmodel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bigmodel -d bigmodel"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://bigmodel:bigmodel@localhost:5432/bigmodel?sslmode=disable
+      APP_DATA_DIR: /tmp/bigmodel-ci-data
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test（含数据库集成测试）
+        run: go test ./... -v
