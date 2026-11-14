@@ -75,6 +75,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("PUT /api/exam/questions/{id}", s.requireAuth(s.requireRole(s.handleUpdateQuestion, kbRoles...)))
 	mux.HandleFunc("DELETE /api/exam/questions/{id}", s.requireAuth(s.requireRole(s.handleDisableQuestion, kbRoles...)))
 
+	mux.HandleFunc("POST /api/exam/exams", s.requireAuth(s.requireRole(s.handleCreateExam, kbRoles...)))
+	mux.HandleFunc("GET /api/exam/exams", s.requireAuth(s.requireRole(s.handleListExams, kbRoles...)))
+	mux.HandleFunc("GET /api/exam/exams/{id}", s.requireAuth(s.requireRole(s.handleGetExam, kbRoles...)))
+	mux.HandleFunc("PUT /api/exam/exams/{id}", s.requireAuth(s.requireRole(s.handleUpdateExam, kbRoles...)))
+	mux.HandleFunc("PUT /api/exam/exams/{id}/items", s.requireAuth(s.requireRole(s.handleSetExamItems, kbRoles...)))
+	mux.HandleFunc("POST /api/exam/exams/{id}/publish", s.requireAuth(s.requireRole(s.handlePublishExam, kbRoles...)))
+	mux.HandleFunc("DELETE /api/exam/exams/{id}", s.requireAuth(s.requireRole(s.handleDisableExam, kbRoles...)))
+
 	mux.HandleFunc("/", s.handleNotFound)
 
 	s.http = &http.Server{
