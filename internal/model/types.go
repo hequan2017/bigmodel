@@ -28,8 +28,8 @@ type ChatEvent struct {
 
 // Usage 是供应商提供的 Token 使用量；未提供时为 nil，不伪造精确用量。
 type Usage struct {
-	PromptTokens     int
-	CompletionTokens int
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
 }
 
 // ChatClient 流式调用 Chat 服务。

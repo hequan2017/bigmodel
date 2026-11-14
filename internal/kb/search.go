@@ -58,15 +58,29 @@ type Candidate struct {
 	EmbeddingModel string   `json:"model_version"`
 }
 
-// Search 使用知识库绑定的 Embedding 模型做向量检索。
-// 前置条件：服务层已完成授权校验；仅返回 ready 文档的片段
-// （停用文档立即不可检索）；授权范围不由客户端提交的参数决定。
+// Search 面向教师/管理员的调试检索：先做知识库授权校验（§7.2）。
 func (s *Service) Search(ctx context.Context, userID int64, isAdmin bool, kbID int64,
 	req SearchRequest, embed model.EmbeddingClient, embedModelName string,
 ) ([]Candidate, error) {
 	if _, err := s.checkAccess(ctx, userID, isAdmin, kbID); err != nil {
 		return nil, err
 	}
+	return s.searchByVector(ctx, kbID, req, embed, embedModelName)
+}
+
+// SearchForApp 供已发布问答应用运行时检索。
+// 授权由"应用已发布"建立（§4.3/§9.3）：检索以服务端应用配置为准，
+// 不经客户端知识库参数，因此不做用户级知识库校验。
+func (s *Service) SearchForApp(ctx context.Context, kbID int64,
+	req SearchRequest, embed model.EmbeddingClient, embedModelName string,
+) ([]Candidate, error) {
+	return s.searchByVector(ctx, kbID, req, embed, embedModelName)
+}
+
+// searchByVector 是向量检索的公共实现：仅返回 ready 文档片段。
+func (s *Service) searchByVector(ctx context.Context, kbID int64,
+	req SearchRequest, embed model.EmbeddingClient, embedModelName string,
+) ([]Candidate, error) {
 	if embed == nil {
 		return nil, ErrEmbeddingNotConfigured
 	}

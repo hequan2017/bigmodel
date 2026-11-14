@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/hequan2017/bigmodel/internal/api"
+	"github.com/hequan2017/bigmodel/internal/app"
 	"github.com/hequan2017/bigmodel/internal/auth"
 	"github.com/hequan2017/bigmodel/internal/config"
 	"github.com/hequan2017/bigmodel/internal/kb"
@@ -24,6 +25,7 @@ type Server struct {
 	auth   *auth.Service
 	models *model.Service
 	kb     *kb.Service
+	apps   *app.Service
 	log    *slog.Logger
 	http   *http.Server
 }
@@ -32,6 +34,7 @@ type Server struct {
 func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.Service, kbSvc *kb.Service) *Server {
 	s := &Server{cfg: cfg, pool: pool, log: log, models: models, kb: kbSvc}
 	s.auth = auth.NewService(pool, cfg.SessionTTL)
+	s.apps = app.NewService(pool, s.kb)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleLiveness)
@@ -54,6 +57,14 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/kb/{id}/documents/{docID}/retry", s.requireAuth(s.requireRole(s.handleRetryDocument, kbRoles...)))
 	mux.HandleFunc("GET /api/kb/{id}/documents/{docID}/chunks", s.requireAuth(s.requireRole(s.handleListChunks, kbRoles...)))
 	mux.HandleFunc("POST /api/kb/{id}/search", s.requireAuth(s.requireRole(s.handleSearchKB, kbRoles...)))
+
+	mux.HandleFunc("POST /api/apps", s.requireAuth(s.requireRole(s.handleCreateApp, kbRoles...)))
+	mux.HandleFunc("GET /api/apps", s.requireAuth(s.handleListApps))
+	mux.HandleFunc("GET /api/apps/{id}", s.requireAuth(s.handleGetApp))
+	mux.HandleFunc("PUT /api/apps/{id}", s.requireAuth(s.requireRole(s.handleUpdateApp, kbRoles...)))
+	mux.HandleFunc("POST /api/apps/{id}/publish", s.requireAuth(s.requireRole(s.handlePublishApp, kbRoles...)))
+	mux.HandleFunc("DELETE /api/apps/{id}", s.requireAuth(s.requireRole(s.handleDisableApp, kbRoles...)))
+	mux.HandleFunc("POST /api/apps/{id}/run", s.requireAuth(s.handleRunApp))
 
 	mux.HandleFunc("/", s.handleNotFound)
 

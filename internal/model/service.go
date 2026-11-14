@@ -55,9 +55,6 @@ func NewService(pool *pgxpool.Pool, cfg config.Config) *Service {
 	return s
 }
 
-// ChatConfigured 返回 Chat 上游是否已配置。
-func (s *Service) ChatConfigured() bool { return s.chatClient != nil }
-
 // EmbeddingConfigured 返回 Embedding 上游是否已配置。
 func (s *Service) EmbeddingConfigured() bool { return s.embeddingClient != nil }
 
@@ -66,6 +63,15 @@ func (s *Service) Embedding() EmbeddingClient { return s.embeddingClient }
 
 // EmbeddingModelName 返回已配置的 Embedding 模型标识。
 func (s *Service) EmbeddingModelName() string { return s.embeddingModel }
+
+// ChatConfigured 返回 Chat 上游是否已配置。
+func (s *Service) ChatConfigured() bool { return s.chatClient != nil }
+
+// Chat 返回已配置的 Chat 客户端；未配置返回 nil。
+func (s *Service) Chat() ChatClient { return s.chatClient }
+
+// ChatModelName 返回已配置的 Chat 模型标识。
+func (s *Service) ChatModelName() string { return s.chatModel }
 
 // SeedProfiles 将部署配置镜像到 model_profiles（幂等）。
 // 配置值变化时递增 config_version，便于定位历史运行使用的配置。
