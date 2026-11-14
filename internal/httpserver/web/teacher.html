@@ -217,7 +217,7 @@
         <option value="exam.disable">exam.disable</option>
       </select></label>
       <button class="act gray" onclick="loadAudit()">刷新</button></h2>
-      <table id="auditTable"><thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>资源</th><th>结果</th></tr></thead><tbody></tbody></table>
+      <table id="auditTable"><thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>资源</th><th>结果</th><th>request_id</th></tr></thead><tbody></tbody></table>
       <div class="meta">基础留痕查看，不宣称防篡改审计；不记录口令/令牌/密钥。</div>
     </div>
   </section>
@@ -511,7 +511,7 @@ async function loadKBs() {
     card.style.boxShadow = "none"; card.style.border = "1px solid #e5e7eb";
     card.innerHTML = `<h3>#${k.id} ${k.name} <span class="meta">${k.description || ""}</span>
       <span class="badge ok">${k.doc_count} 篇</span>
-      <span class="meta">Embedding 维度: ${k.embedding_dimension ?? "未测定"}</span></h3>`;
+      <span class="meta">Embedding: ${k.embedding_model_name || "未绑定"} · 维度: ${k.embedding_dimension ?? "未测定"}</span></h3>`;
     const docs = document.createElement("div");
     card.appendChild(docs);
     box.appendChild(card);
@@ -763,7 +763,8 @@ async function loadAudit() {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${fmtTime(e.created_at)}</td><td>${e.actor_name || e.actor_id || "-"}</td>
         <td>${e.action}</td><td>${e.resource_type}#${e.resource_id}</td>
-        <td>${e.result}</td>`;
+        <td>${e.result}</td>
+        <td><span class="meta">${e.request_id ? e.request_id.slice(0, 12) + "…" : "-"}</span></td>`;
       tbody.appendChild(tr);
     }
   } catch (e) {
