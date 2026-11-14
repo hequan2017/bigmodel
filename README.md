@@ -47,6 +47,7 @@ internal/auth       登录认证、会话与角色权限
 internal/audit      关键操作留痕
 internal/model      Chat/Embedding 适配器与模型档案
 internal/kb         知识库、文档上传校验、切分与处理 worker
+internal/prompt     Prompt 模板校验与白名单渲染
 internal/httpserver 路由、中间件与健康检查
 migrations          内嵌 SQL 迁移（启动时自动按序执行）
 ```
@@ -90,7 +91,7 @@ go run ./cmd/server
 - [ ] ④ 知识库创建与 TXT/Markdown 文档上传
 - [x] ⑤ 文档解析/切分/向量化 worker 与状态机
 - [x] ⑥ pgvector 向量检索与引用返回
-- [ ] ⑦ Prompt 编辑与变量白名单校验
+- [x] ⑦ Prompt 编辑与变量白名单校验
 - [ ] ⑧ 问答应用草稿/发布与 SSE 流式问答
 - [ ] ⑨ 考试题库（单选/判断）
 - [ ] ⑩ 组卷与发布快照

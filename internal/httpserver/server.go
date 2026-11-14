@@ -44,6 +44,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/admin/models/embedding/test", s.requireAuth(s.requireRole(s.handleTestEmbedding, auth.RoleAdmin)))
 
 	kbRoles := []string{auth.RoleTeacher, auth.RoleAdmin}
+	mux.HandleFunc("POST /api/prompt/validate", s.requireAuth(s.requireRole(s.handleValidatePrompt, kbRoles...)))
+	mux.HandleFunc("POST /api/prompt/render", s.requireAuth(s.requireRole(s.handleRenderPrompt, kbRoles...)))
 	mux.HandleFunc("POST /api/kb", s.requireAuth(s.requireRole(s.handleCreateKB, kbRoles...)))
 	mux.HandleFunc("GET /api/kb", s.requireAuth(s.requireRole(s.handleListKBs, kbRoles...)))
 	mux.HandleFunc("GET /api/kb/{id}", s.requireAuth(s.requireRole(s.handleGetKB, kbRoles...)))
