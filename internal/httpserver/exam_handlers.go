@@ -124,12 +124,22 @@ func (s *Server) handleGetQuestion(w http.ResponseWriter, r *http.Request) {
 // writeExamHttpError 把考试服务错误映射为 HTTP 状态码与稳定错误码。
 func writeExamHttpError(err error) (string, int) {
 	switch {
-	case errors.Is(err, exam.ErrNotFound):
+	case errors.Is(err, exam.ErrNotFound), errors.Is(err, exam.ErrAttemptNotFound):
 		return "not_found", http.StatusNotFound
 	case errors.Is(err, exam.ErrExamNotDraft):
 		return "exam_not_draft", http.StatusConflict
 	case errors.Is(err, exam.ErrExamDuplicate):
 		return "duplicate_exam", http.StatusConflict
+	case errors.Is(err, exam.ErrExamNotOpen):
+		return "exam_not_open", http.StatusConflict
+	case errors.Is(err, exam.ErrExamClosed):
+		return "exam_closed", http.StatusConflict
+	case errors.Is(err, exam.ErrAttemptExpired):
+		return "attempt_expired", http.StatusConflict
+	case errors.Is(err, exam.ErrAttemptSubmitted):
+		return "attempt_submitted", http.StatusConflict
+	case errors.Is(err, exam.ErrRevisionConflict):
+		return "revision_conflict", http.StatusConflict
 	case errors.Is(err, exam.ErrExamInvalidTimes),
 		errors.Is(err, exam.ErrExamMissingTimes),
 		errors.Is(err, exam.ErrExamNoItems),
@@ -137,6 +147,8 @@ func writeExamHttpError(err error) (string, int) {
 		errors.Is(err, exam.ErrExamItemInvalid),
 		errors.Is(err, exam.ErrInvalidData):
 		return "invalid_data", http.StatusBadRequest
+	case errors.Is(err, exam.ErrAnswerInvalid):
+		return "invalid_answer", http.StatusBadRequest
 	default:
 		return "internal_error", http.StatusInternalServerError
 	}
@@ -292,4 +304,61 @@ func (s *Server) handleGetExam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"exam": e})
+}
+
+// handleStartAttempt 学生开始考试（幂等，不重置计时）。
+func (s *Server) handleStartAttempt(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	attempt, err := s.exam.StartAttempt(r.Context(), current.ID, examID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"attempt": attempt})
+}
+
+// handleGetAttempt 学生恢复作答（已保存答案 + 原始截止时间）。
+func (s *Server) handleGetAttempt(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	attempt, err := s.exam.GetAttempt(r.Context(), current.ID, examID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"attempt": attempt})
+}
+
+// handleSaveAnswers 学生自动保存（版本冲突控制）。
+func (s *Server) handleSaveAnswers(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
+	var in exam.SaveAnswersInput
+	if err := jsonDecode(r.Body, &in); err != nil {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "请求体必须是 JSON")
+		return
+	}
+	revision, savedAt, err := s.exam.SaveAttemptAnswers(r.Context(), current.ID, examID, in)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"answer_revision": revision,
+		"saved_at":        savedAt,
+	})
 }
