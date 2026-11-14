@@ -47,6 +47,17 @@ jobs:
       - name: Test（含数据库集成测试）
         run: go test ./... -v
 
+      - name: 数据库诊断（扩展与迁移状态）
+        if: always()
+        run: |
+          DBID=${{ job.services.db.id }}
+          docker exec $DBID psql -U bigmodel -d bigmodel -c \
+            "SELECT extname FROM pg_extension;" || true
+          docker exec $DBID psql -U bigmodel -d bigmodel -c \
+            "SELECT version FROM schema_migrations ORDER BY version;" || true
+          docker exec $DBID psql -U bigmodel -d bigmodel -c \
+            "SELECT tableschema FROM (SELECT 'x' AS tableschema) t;" || true
+
       - name: E2E 冒烟回归（mock 上游 + 全链路）
         run: |
           set +e
@@ -67,11 +78,18 @@ jobs:
           bash scripts/e2e-smoke.sh http://127.0.0.1:18080 > /tmp/e2e-out.txt 2>&1
           RC=$?
           cat /tmp/e2e-out.txt
+          DBID=${{ job.services.db.id }}
           {
             echo "=== e2e 输出 ==="; cat /tmp/e2e-out.txt
             echo "=== seed.log ==="; cat /tmp/seed.log
             echo "=== server.log ==="; tail -40 /tmp/server.log
             echo "=== mock.log ==="; cat /tmp/mock.log
+            echo "=== 扩展 ==="
+            docker exec $DBID psql -U bigmodel -d bigmodel -c "SELECT extname FROM pg_extension;" 2>&1
+            echo "=== 迁移表 ==="
+            docker exec $DBID psql -U bigmodel -d bigmodel -c "SELECT version FROM schema_migrations ORDER BY version;" 2>&1
+            echo "=== document_chunks 是否存在 ==="
+            docker exec $DBID psql -U bigmodel -d bigmodel -c "SELECT to_regclass('public.document_chunks');" 2>&1
           } > /tmp/ci-diag.txt
           git config user.email ci-debug@local
           git config user.name ci-debug
