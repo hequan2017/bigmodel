@@ -16,6 +16,7 @@ import (
 	"github.com/hequan2017/bigmodel/internal/config"
 	"github.com/hequan2017/bigmodel/internal/database"
 	"github.com/hequan2017/bigmodel/internal/httpserver"
+	"github.com/hequan2017/bigmodel/internal/kb"
 	"github.com/hequan2017/bigmodel/internal/model"
 )
 
@@ -61,7 +62,22 @@ func run() error {
 		"embedding_configured", modelSvc.EmbeddingConfigured(),
 	)
 
-	srv := httpserver.New(cfg, pool, logger, modelSvc)
+	kbSvc := kb.NewService(pool, cfg.DataDir)
+	srv := httpserver.New(cfg, pool, logger, modelSvc, kbSvc)
+
+	// 单进程文档处理 worker；未配置 Embedding 上游时不启动，上传文档保持 queued。
+	if modelSvc.EmbeddingConfigured() {
+		docWorker := kbSvc.NewWorker(modelSvc.Embedding(), modelSvc.EmbeddingModelName(), 2*time.Second, logger)
+		if stale, err := docWorker.RecoverStale(ctx); err != nil {
+			logger.Warn("中断文档恢复失败", "error", err)
+		} else if stale > 0 {
+			logger.Info("已将上次中断的文档标记为 failed，可人工重试", "count", stale)
+		}
+		go docWorker.Run(ctx)
+		logger.Info("文档处理 worker 已启动", "embedding_model", modelSvc.EmbeddingModelName())
+	} else {
+		logger.Warn("未配置 Embedding 上游，文档处理 worker 未启动，上传文档将保持 queued")
+	}
 
 	serveErr := make(chan error, 1)
 	go func() {

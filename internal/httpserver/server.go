@@ -28,11 +28,10 @@ type Server struct {
 	http   *http.Server
 }
 
-// New 构造 HTTP 服务；models 为模型接入服务。
-func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.Service) *Server {
-	s := &Server{cfg: cfg, pool: pool, log: log, models: models}
+// New 构造 HTTP 服务；models 为模型接入服务，kbSvc 为知识库服务。
+func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.Service, kbSvc *kb.Service) *Server {
+	s := &Server{cfg: cfg, pool: pool, log: log, models: models, kb: kbSvc}
 	s.auth = auth.NewService(pool, cfg.SessionTTL)
-	s.kb = kb.NewService(pool, cfg.DataDir)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleLiveness)
@@ -51,6 +50,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("POST /api/kb/{id}/documents", s.requireAuth(s.requireRole(s.handleUploadDocument, kbRoles...)))
 	mux.HandleFunc("DELETE /api/kb/{id}/documents/{docID}", s.requireAuth(s.requireRole(s.handleDisableDocument, kbRoles...)))
 	mux.HandleFunc("POST /api/kb/{id}/documents/{docID}/retry", s.requireAuth(s.requireRole(s.handleRetryDocument, kbRoles...)))
+	mux.HandleFunc("GET /api/kb/{id}/documents/{docID}/chunks", s.requireAuth(s.requireRole(s.handleListChunks, kbRoles...)))
 
 	mux.HandleFunc("/", s.handleNotFound)
 

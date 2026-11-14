@@ -46,6 +46,7 @@ internal/api        统一响应/错误结构与 request_id
 internal/auth       登录认证、会话与角色权限
 internal/audit      关键操作留痕
 internal/model      Chat/Embedding 适配器与模型档案
+internal/kb         知识库、文档上传校验、切分与处理 worker
 internal/httpserver 路由、中间件与健康检查
 migrations          内嵌 SQL 迁移（启动时自动按序执行）
 ```
@@ -87,7 +88,7 @@ go run ./cmd/server
 - [x] ② 登录认证与 admin/teacher/student 三角色权限
 - [x] ③ 模型接入（ChatClient / EmbeddingClient 与连通性验证）
 - [ ] ④ 知识库创建与 TXT/Markdown 文档上传
-- [ ] ⑤ 文档解析/切分/向量化 worker 与状态机
+- [x] ⑤ 文档解析/切分/向量化 worker 与状态机
 - [ ] ⑥ pgvector 向量检索与引用返回
 - [ ] ⑦ Prompt 编辑与变量白名单校验
 - [ ] ⑧ 问答应用草稿/发布与 SSE 流式问答

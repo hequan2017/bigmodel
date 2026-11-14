@@ -177,3 +177,20 @@ func (s *Server) handleRetryDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"document": doc})
 }
+
+// handleListChunks 返回文档片段（文本与定位，不含向量本体）。
+func (s *Server) handleListChunks(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	kbID, ok1 := pathID(r, "id")
+	docID, ok2 := pathID(r, "docID")
+	if !ok1 || !ok2 {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "ID 非法")
+		return
+	}
+	chunks, err := s.kb.ListChunks(r.Context(), current.ID, current.Role == auth.RoleAdmin, kbID, docID)
+	if err != nil {
+		s.writeKBError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{"chunks": chunks})
+}

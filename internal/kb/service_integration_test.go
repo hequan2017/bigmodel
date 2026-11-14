@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,22 +17,40 @@ import (
 	"github.com/hequan2017/bigmodel/internal/database"
 )
 
-// newTestService 连接本地数据库；不可用时跳过集成测试。
+// newTestService 在独立 schema 中构建测试环境；数据库不可用时跳过集成测试。
+// 独立 schema 保证测试不触碰共享开发数据（如演示知识库与全局处理队列）。
 func newTestService(t *testing.T) (*Service, *pgxpool.Pool) {
 	t.Helper()
 	cfg, err := config.Load(nil)
 	if err != nil {
 		t.Skipf("配置不可用，跳过集成测试: %v", err)
 	}
-	pool, err := database.Connect(context.Background(), cfg)
+	ctx := context.Background()
+	if err := database.EnsureSchema(ctx, cfg, testSchemaName(t)); err != nil {
+		t.Skipf("创建测试 schema 失败: %v", err)
+	}
+	pool, err := database.ConnectWithSchema(ctx, cfg, testSchemaName(t))
 	if err != nil {
-		t.Skipf("数据库不可用，跳过集成测试: %v", err)
+		_ = database.DropSchema(ctx, cfg, testSchemaName(t))
+		t.Skipf("连接测试 schema 失败: %v", err)
 	}
-	t.Cleanup(pool.Close)
-	if err := database.Migrate(context.Background(), pool); err != nil {
-		t.Skipf("迁移执行失败，跳过集成测试: %v", err)
+	if err := database.Migrate(ctx, pool); err != nil {
+		pool.Close()
+		_ = database.DropSchema(ctx, cfg, testSchemaName(t))
+		t.Skipf("测试 schema 迁移失败: %v", err)
 	}
+	t.Cleanup(func() {
+		pool.Close()
+		_ = database.DropSchema(ctx, cfg, testSchemaName(t))
+	})
 	return NewService(pool, t.TempDir()), pool
+}
+
+func testSchemaName(t *testing.T) string {
+	t.Helper()
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(t.Name()))
+	return fmt.Sprintf("itest_%x_%d", h.Sum32(), time.Now().UnixNano())
 }
 
 func TestKBFlowIntegration(t *testing.T) {
@@ -53,14 +72,6 @@ func TestKBFlowIntegration(t *testing.T) {
 		RETURNING id`, "itest-embedding-"+suffix).Scan(&modelID); err != nil {
 		t.Fatalf("创建测试档案: %v", err)
 	}
-	t.Cleanup(func() {
-		_, _ = pool.Exec(ctx, `
-			DELETE FROM documents WHERE knowledge_base_id IN (SELECT id FROM knowledge_bases WHERE owner_id IN (
-				SELECT id FROM users WHERE login_name IN ($1, $2)))`, userA, userB)
-		_, _ = pool.Exec(ctx, `DELETE FROM knowledge_bases WHERE owner_id IN (SELECT id FROM users WHERE login_name IN ($1, $2))`, userA, userB)
-		_, _ = pool.Exec(ctx, `DELETE FROM model_profiles WHERE id = $1`, modelID)
-		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE login_name IN ($1, $2)`, userA, userB)
-	})
 	var userAID, userBID int64
 	if err := pool.QueryRow(ctx, `SELECT id FROM users WHERE login_name = $1`, userA).Scan(&userAID); err != nil {
 		t.Fatalf("查询用户A: %v", err)

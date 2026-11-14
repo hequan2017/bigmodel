@@ -61,6 +61,12 @@ func (s *Service) ChatConfigured() bool { return s.chatClient != nil }
 // EmbeddingConfigured 返回 Embedding 上游是否已配置。
 func (s *Service) EmbeddingConfigured() bool { return s.embeddingClient != nil }
 
+// Embedding 返回已配置的 Embedding 客户端；未配置返回 nil。
+func (s *Service) Embedding() EmbeddingClient { return s.embeddingClient }
+
+// EmbeddingModelName 返回已配置的 Embedding 模型标识。
+func (s *Service) EmbeddingModelName() string { return s.embeddingModel }
+
 // SeedProfiles 将部署配置镜像到 model_profiles（幂等）。
 // 配置值变化时递增 config_version，便于定位历史运行使用的配置。
 func (s *Service) SeedProfiles(ctx context.Context) error {
