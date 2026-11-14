@@ -30,11 +30,13 @@ func TestLoadDefaults(t *testing.T) {
 
 func TestLoadOverrides(t *testing.T) {
 	cfg, err := Load(envOf(map[string]string{
-		"APP_HTTP_ADDR": ":9090",
-		"DATABASE_URL":  "postgresql://u:p@db:5432/x?sslmode=require",
-		"APP_DATA_DIR":  "/var/lib/bigmodel",
-		"APP_LOG_LEVEL": "DEBUG",
-		"APP_SESSION_TTL": "24h",
+		"APP_HTTP_ADDR":       ":9090",
+		"DATABASE_URL":        "postgresql://u:p@db:5432/x?sslmode=require",
+		"APP_DATA_DIR":        "/var/lib/bigmodel",
+		"APP_LOG_LEVEL":       "DEBUG",
+		"APP_SESSION_TTL":     "24h",
+		"APP_CHAT_MODEL":      "mock-chat",
+		"APP_EMBEDDING_MODEL": "mock-embedding",
 	}))
 	if err != nil {
 		t.Fatalf("覆盖配置应可用: %v", err)
@@ -50,6 +52,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.SessionTTL != 24*time.Hour {
 		t.Errorf("SessionTTL = %v", cfg.SessionTTL)
+	}
+	if cfg.ChatModel != "mock-chat" || cfg.EmbeddingModel != "mock-embedding" {
+		t.Errorf("模型配置未生效: %+v", cfg)
 	}
 }
 

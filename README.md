@@ -30,6 +30,8 @@ curl http://127.0.0.1:8080/readyz
 | APP_DATA_DIR | `./data` | 原始资料等本地持久化目录 |
 | APP_LOG_LEVEL | `info` | debug / info / warn / error |
 | APP_SESSION_TTL | `12h` | 会话有效期（Go duration） |
+| APP_CHAT_BASE_URL / APP_CHAT_API_KEY / APP_CHAT_MODEL | 未配置 | Chat 上游（OpenAI 兼容协议） |
+| APP_EMBEDDING_BASE_URL / APP_EMBEDDING_API_KEY / APP_EMBEDDING_MODEL | 未配置 | Embedding 上游 |
 | APP_SEED_*_PASSWORD | 见下方演示账号表 | 初始化账号口令（仅 seed 使用） |
 
 ## 目录结构
@@ -37,11 +39,13 @@ curl http://127.0.0.1:8080/readyz
 ```
 cmd/server          入口进程
 cmd/seed            预置演示账号初始化
+cmd/mockupstream    开发用 OpenAI 协议模拟上游（仅联调，不用于生产）
 internal/config     部署配置加载（环境变量）
 internal/database   连接池与迁移执行
 internal/api        统一响应/错误结构与 request_id
 internal/auth       登录认证、会话与角色权限
 internal/audit      关键操作留痕
+internal/model      Chat/Embedding 适配器与模型档案
 internal/httpserver 路由、中间件与健康检查
 migrations          内嵌 SQL 迁移（启动时自动按序执行）
 ```
@@ -63,11 +67,25 @@ TOKEN=$(curl -s -X POST http://127.0.0.1:8080/api/auth/login \
 curl -s http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN"
 ```
 
+## 模型联调
+
+生产环境通过 `APP_CHAT_*` / `APP_EMBEDDING_*` 指向 OpenAI 兼容的真实服务；本地没有上游时，可用开发用模拟器验证协议链路（明确标注为测试工具，不伪造生产结果）：
+
+```bash
+go run ./cmd/mockupstream   # 默认 :18081
+
+APP_CHAT_BASE_URL=http://127.0.0.1:18081 APP_CHAT_API_KEY=dev APP_CHAT_MODEL=mock-chat \
+APP_EMBEDDING_BASE_URL=http://127.0.0.1:18081 APP_EMBEDDING_API_KEY=dev APP_EMBEDDING_MODEL=mock-embedding \
+go run ./cmd/server
+```
+
+管理员登录后调用 `POST /api/admin/models/chat/test` 与 `POST /api/admin/models/embedding/test` 实测连通性（真实发起一次上游调用；错误密钥、超时、取消均返回可辨识错误码）。
+
 ## 当前进度（P0）
 
 - [x] ① 项目骨架 / 配置加载 / 数据库迁移 / 健康检查
 - [x] ② 登录认证与 admin/teacher/student 三角色权限
-- [ ] ③ 模型接入（ChatClient / EmbeddingClient 与连通性验证）
+- [x] ③ 模型接入（ChatClient / EmbeddingClient 与连通性验证）
 - [ ] ④ 知识库创建与 TXT/Markdown 文档上传
 - [ ] ⑤ 文档解析/切分/向量化 worker 与状态机
 - [ ] ⑥ pgvector 向量检索与引用返回

@@ -16,6 +16,7 @@ import (
 	"github.com/hequan2017/bigmodel/internal/config"
 	"github.com/hequan2017/bigmodel/internal/database"
 	"github.com/hequan2017/bigmodel/internal/httpserver"
+	"github.com/hequan2017/bigmodel/internal/model"
 )
 
 func main() {
@@ -51,7 +52,16 @@ func run() error {
 	}
 	logger.Info("数据库迁移完成")
 
-	srv := httpserver.New(cfg, pool, logger)
+	modelSvc := model.NewService(pool, cfg)
+	if err := modelSvc.SeedProfiles(ctx); err != nil {
+		return fmt.Errorf("初始化模型配置: %w", err)
+	}
+	logger.Info("模型配置已就绪",
+		"chat_configured", modelSvc.ChatConfigured(),
+		"embedding_configured", modelSvc.EmbeddingConfigured(),
+	)
+
+	srv := httpserver.New(cfg, pool, logger, modelSvc)
 
 	serveErr := make(chan error, 1)
 	go func() {

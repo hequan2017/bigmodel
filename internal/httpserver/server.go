@@ -13,20 +13,22 @@ import (
 	"github.com/hequan2017/bigmodel/internal/api"
 	"github.com/hequan2017/bigmodel/internal/auth"
 	"github.com/hequan2017/bigmodel/internal/config"
+	"github.com/hequan2017/bigmodel/internal/model"
 )
 
 // Server 持有运行期依赖，全部路由通过它注册。
 type Server struct {
-	cfg  config.Config
-	pool *pgxpool.Pool
-	auth *auth.Service
-	log  *slog.Logger
-	http *http.Server
+	cfg    config.Config
+	pool   *pgxpool.Pool
+	auth   *auth.Service
+	models *model.Service
+	log    *slog.Logger
+	http   *http.Server
 }
 
-// New 构造 HTTP 服务。
-func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) *Server {
-	s := &Server{cfg: cfg, pool: pool, log: log}
+// New 构造 HTTP 服务；models 为模型接入服务。
+func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.Service) *Server {
+	s := &Server{cfg: cfg, pool: pool, log: log, models: models}
 	s.auth = auth.NewService(pool, cfg.SessionTTL)
 
 	mux := http.NewServeMux()
@@ -35,6 +37,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger) *Server {
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/auth/me", s.requireAuth(s.handleMe))
+	mux.HandleFunc("GET /api/admin/models", s.requireAuth(s.requireRole(s.handleListModels, auth.RoleAdmin)))
+	mux.HandleFunc("POST /api/admin/models/chat/test", s.requireAuth(s.requireRole(s.handleTestChat, auth.RoleAdmin)))
+	mux.HandleFunc("POST /api/admin/models/embedding/test", s.requireAuth(s.requireRole(s.handleTestEmbedding, auth.RoleAdmin)))
 	mux.HandleFunc("/", s.handleNotFound)
 
 	s.http = &http.Server{

@@ -12,11 +12,20 @@ import (
 
 // Config 是进程启动所需的部署配置。
 type Config struct {
-	HTTPAddr    string // HTTP 监听地址，例如 :8080
-	DatabaseURL string // PostgreSQL 连接串
-	DataDir     string // 原始资料等本地持久化目录
-	LogLevel    string // debug / info / warn / error
+	HTTPAddr    string        // HTTP 监听地址，例如 :8080
+	DatabaseURL string        // PostgreSQL 连接串
+	DataDir     string        // 原始资料等本地持久化目录
+	LogLevel    string        // debug / info / warn / error
 	SessionTTL  time.Duration // 会话有效期
+
+	// 模型服务（OpenAI 兼容协议）。端点与密钥由部署环境注入，
+	// 密钥只保存在环境变量中，不落库、不进日志与接口响应。
+	ChatBaseURL      string
+	ChatAPIKey       string
+	ChatModel        string
+	EmbeddingBaseURL string
+	EmbeddingAPIKey  string
+	EmbeddingModel   string
 }
 
 // GetEnv 取环境变量的函数类型，便于测试注入。
@@ -29,10 +38,16 @@ func Load(get GetEnv) (Config, error) {
 	}
 
 	cfg := Config{
-		HTTPAddr:    firstNonEmpty(get("APP_HTTP_ADDR"), ":8080"),
-		DatabaseURL: firstNonEmpty(get("DATABASE_URL"), "postgres://bigmodel:bigmodel@localhost:5432/bigmodel?sslmode=disable"),
-		DataDir:     firstNonEmpty(get("APP_DATA_DIR"), "./data"),
-		LogLevel:    strings.ToLower(strings.TrimSpace(firstNonEmpty(get("APP_LOG_LEVEL"), "info"))),
+		HTTPAddr:         firstNonEmpty(get("APP_HTTP_ADDR"), ":8080"),
+		DatabaseURL:      firstNonEmpty(get("DATABASE_URL"), "postgres://bigmodel:bigmodel@localhost:5432/bigmodel?sslmode=disable"),
+		DataDir:          firstNonEmpty(get("APP_DATA_DIR"), "./data"),
+		LogLevel:         strings.ToLower(strings.TrimSpace(firstNonEmpty(get("APP_LOG_LEVEL"), "info"))),
+		ChatBaseURL:      strings.TrimRight(strings.TrimSpace(get("APP_CHAT_BASE_URL")), "/"),
+		ChatAPIKey:       strings.TrimSpace(get("APP_CHAT_API_KEY")),
+		ChatModel:        strings.TrimSpace(get("APP_CHAT_MODEL")),
+		EmbeddingBaseURL: strings.TrimRight(strings.TrimSpace(get("APP_EMBEDDING_BASE_URL")), "/"),
+		EmbeddingAPIKey:  strings.TrimSpace(get("APP_EMBEDDING_API_KEY")),
+		EmbeddingModel:   strings.TrimSpace(get("APP_EMBEDDING_MODEL")),
 	}
 
 	ttlRaw := firstNonEmpty(get("APP_SESSION_TTL"), "12h")
