@@ -5,3 +5,5 @@ data/
 .DS_Store
 loadtest
 cmd/dbdiag/
+docs/coverage.html
+cover.out
