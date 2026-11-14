@@ -51,6 +51,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("DELETE /api/kb/{id}/documents/{docID}", s.requireAuth(s.requireRole(s.handleDisableDocument, kbRoles...)))
 	mux.HandleFunc("POST /api/kb/{id}/documents/{docID}/retry", s.requireAuth(s.requireRole(s.handleRetryDocument, kbRoles...)))
 	mux.HandleFunc("GET /api/kb/{id}/documents/{docID}/chunks", s.requireAuth(s.requireRole(s.handleListChunks, kbRoles...)))
+	mux.HandleFunc("POST /api/kb/{id}/search", s.requireAuth(s.requireRole(s.handleSearchKB, kbRoles...)))
 
 	mux.HandleFunc("/", s.handleNotFound)
 

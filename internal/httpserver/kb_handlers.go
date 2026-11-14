@@ -29,6 +29,10 @@ func (s *Server) writeKBError(w http.ResponseWriter, r *http.Request, err error)
 		api.WriteError(w, r, http.StatusBadRequest, "invalid_file", err.Error())
 	case errors.Is(err, kb.ErrInvalidState):
 		api.WriteError(w, r, http.StatusConflict, "invalid_state", "当前文档状态不允许该操作")
+	case errors.Is(err, kb.ErrInvalidQuestion):
+		api.WriteError(w, r, http.StatusBadRequest, "invalid_question", err.Error())
+	case errors.Is(err, kb.ErrDimensionMismatch):
+		api.WriteError(w, r, http.StatusConflict, "dimension_mismatch", "查询向量维度与知识库索引不一致")
 	default:
 		s.log.Error("知识库操作失败", "error", err)
 		api.WriteError(w, r, http.StatusInternalServerError, "internal_error", "知识库操作失败")
@@ -193,4 +197,40 @@ func (s *Server) handleListChunks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"chunks": chunks})
+}
+
+// handleSearchKB 教师调试：对本人知识库做向量检索，返回可核验引用。
+func (s *Server) handleSearchKB(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	kbID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "知识库 ID 非法")
+		return
+	}
+	if !s.models.EmbeddingConfigured() {
+		api.WriteError(w, r, http.StatusConflict, "embedding_not_configured", "尚未配置 Embedding 上游，无法检索")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	var req struct {
+		Question string `json:"question"`
+		TopK     int    `json:"top_k"`
+	}
+	if err := jsonDecode(r.Body, &req); err != nil {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "请求体必须是 JSON")
+		return
+	}
+
+	candidates, err := s.kb.Search(r.Context(), current.ID, current.Role == auth.RoleAdmin, kbID,
+		kb.SearchRequest{Question: req.Question, TopK: req.TopK},
+		s.models.Embedding(), s.models.EmbeddingModelName())
+	if err != nil {
+		s.writeKBError(w, r, err)
+		return
+	}
+	api.WriteJSON(w, http.StatusOK, map[string]any{
+		"candidates": candidates,
+		"model":      s.models.EmbeddingModelName(),
+		"count":      len(candidates),
+	})
 }
