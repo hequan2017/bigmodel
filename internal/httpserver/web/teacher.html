@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 能力考试 · 教师端</title>
+<style>
+  body { font-family: system-ui, "PingFang SC", sans-serif; background: #f4f6f9; margin: 0; }
+  header { background: #1f2937; color: #fff; padding: 12px 24px; display: flex;
+           justify-content: space-between; align-items: center; }
+  header .name { font-size: 15px; }
+  header button { background: #374151; color: #fff; border: 0; border-radius: 6px;
+                  padding: 6px 12px; cursor: pointer; }
+  nav.tabs { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; display: flex; gap: 4px; }
+  nav.tabs button { background: none; border: 0; padding: 12px 16px; font-size: 14px; cursor: pointer;
+                    color: #6b7280; border-bottom: 2px solid transparent; }
+  nav.tabs button.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
+  main { max-width: 1000px; margin: 20px auto; padding: 0 16px; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.06);
+          padding: 20px 24px; margin-bottom: 16px; }
+  h2 { font-size: 17px; margin: 0 0 14px; color: #1f2937; }
+  h3 { font-size: 15px; margin: 18px 0 10px; color: #374151; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid #e5e7eb;
+           vertical-align: top; word-break: break-all; }
+  button.act { background: #2563eb; color: #fff; border: 0; border-radius: 6px;
+               padding: 6px 12px; cursor: pointer; font-size: 13px; margin-right: 6px; }
+  button.act.green { background: #059669; }
+  button.act.gray { background: #6b7280; }
+  button.act.red { background: #dc2626; }
+  button.act:disabled { background: #9ca3af; cursor: not-allowed; }
+  input, select, textarea { padding: 7px; border: 1px solid #d1d5db; border-radius: 6px;
+                            font-size: 13px; font-family: inherit; box-sizing: border-box; }
+  textarea { width: 100%; min-height: 60px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .row label { font-size: 13px; color: #374151; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px;
+           background: #e5e7eb; color: #374151; }
+  .badge.ok { background: #d1fae5; color: #065f46; }
+  .badge.warn { background: #fef3c7; color: #92400e; }
+  .badge.err { background: #fee2e2; color: #991b1b; }
+  .hidden { display: none; }
+  .err { color: #dc2626; font-size: 13px; white-space: pre-wrap; }
+  .ok { color: #059669; font-size: 13px; }
+  pre.refs { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;
+             padding: 8px; font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow: auto; }
+</style>
+</head>
+<body>
+<header>
+  <div class="name">AI 能力考试 · 教师端（<span id="whoami"></span><span id="roleBadge"></span>）</div>
+  <button onclick="logout()">退出登录</button>
+</header>
+<nav class="tabs">
+  <button data-tab="tab-questions" class="active">题库</button>
+  <button data-tab="tab-exams">考试</button>
+  <button data-tab="tab-kb">知识库</button>
+  <button data-tab="tab-apps">问答应用</button>
+  <button data-tab="tab-models" id="modelsTabBtn" class="hidden">模型（管理员）</button>
+</nav>
+<main>
+  <!-- 题库 -->
+  <section id="tab-questions">
+    <div class="card">
+      <h2>新建题目</h2>
+      <div class="row">
+        <label>题型 <select id="qType" onchange="qTypeChanged()">
+          <option value="single">单选题</option><option value="judge">判断题</option></select></label>
+        <label>分值 <input id="qScore" type="number" value="5" min="0" style="width:70px"></label>
+        <label>等级 <input id="qLevel" placeholder="L1" style="width:80px"></label>
+        <label>标签 <input id="qTags" placeholder="逗号分隔" style="width:160px"></label>
+      </div>
+      <div class="row"><textarea id="qStem" placeholder="题干"></textarea></div>
+      <div id="qOptionsBox">
+        <div class="row" id="optRow0"><label>选项 A <input id="optA" style="flex:1"></label></div>
+        <div class="row" id="optRow1"><label>选项 B <input id="optB" style="flex:1"></label></div>
+        <div class="row" id="optRow2"><label>选项 C <input id="optC" style="flex:1"></label></div>
+        <div class="row" id="optRow3"><label>选项 D <input id="optD" style="flex:1"></label></div>
+      </div>
+      <div class="row" id="qAnswerRow"><label>正确答案 <select id="qAnswer">
+        <option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+        <label id="qJudgeAnswerRow">正确答案 <select id="qJudgeAnswer">
+        <option value="true">正确</option><option value="false">错误</option></select></label></div>
+      <button class="act" onclick="createQuestion()">创建题目</button>
+      <span id="qMsg" class="err"></span>
+    </div>
+    <div class="card"><h2>题目列表</h2>
+      <table id="qTable"><thead><tr><th>ID</th><th>题型</th><th>题干</th><th>答案</th><th>分值</th><th>等级</th><th>状态</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- 考试 -->
+  <section id="tab-exams" class="hidden">
+    <div class="card">
+      <h2>新建考试（草稿）</h2>
+      <div class="row">
+        <label>标题 <input id="eTitle" style="width:220px"></label>
+        <label>等级 <input id="eLevel" placeholder="L1" style="width:70px"></label>
+        <label>开放时间 <input id="eOpen" type="datetime-local"></label>
+        <label>截止时间 <input id="eClose" type="datetime-local"></label>
+        <label>时长(秒) <input id="eDur" type="number" value="3600" min="1" style="width:90px"></label>
+        <button class="act" onclick="createExam()">创建</button>
+      </div>
+      <span id="eMsg" class="err"></span>
+    </div>
+    <div class="card"><h2>考试列表</h2>
+      <table id="eTable"><thead><tr><th>ID</th><th>标题</th><th>状态</th><th>窗口</th><th>总分</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card hidden" id="itemsEditor">
+      <h3>试卷条目：<span id="itemsExamTitle"></span>（勾选题目并设置分值，按勾选顺序编号）</h3>
+      <div id="itemCandidates"></div>
+      <button class="act" onclick="saveItems()">保存试卷条目</button>
+      <span id="itemsMsg" class="err"></span>
+    </div>
+    <div class="card hidden" id="resultsBox">
+      <h3>成绩列表：<span id="resultsExamTitle"></span></h3>
+      <table id="rTable"><thead><tr><th>学生</th><th>状态</th><th>总分</th><th>提交时间</th><th>提交原因</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- 知识库 -->
+  <section id="tab-kb" class="hidden">
+    <div class="card">
+      <h2>新建知识库</h2>
+      <div class="row">
+        <label>名称 <input id="kbName" style="width:200px"></label>
+        <label>说明 <input id="kbDesc" style="width:320px"></label>
+        <button class="act" onclick="createKB()">创建</button>
+      </div>
+      <span id="kbMsg" class="err"></span>
+    </div>
+    <div class="card" id="kbListCard"><h2>知识库与文档</h2>
+      <div class="row">
+        <label>上传文档到 <select id="uploadKb"></select></label>
+        <input type="file" id="uploadFile" accept=".txt,.md,.markdown">
+        <button class="act" onclick="uploadDoc()">上传</button>
+        <span class="meta" style="font-size:12px;color:#6b7280">仅支持 UTF-8 TXT/Markdown，≤5MiB</span>
+      </div>
+      <div id="kbList"></div>
+    </div>
+  </section>
+
+  <!-- 问答应用 -->
+  <section id="tab-apps" class="hidden">
+    <div class="card">
+      <h2>创建问答应用</h2>
+      <div class="row">
+        <label>名称 <input id="aName" style="width:180px"></label>
+        <label>知识库 <select id="aKb"></select></label>
+        <label>TopK <input id="aTopK" type="number" value="5" min="1" max="20" style="width:60px"></label>
+        <label>历史轮数 <input id="aHistory" type="number" value="3" min="0" max="3" style="width:60px"></label>
+      </div>
+      <div class="row"><textarea id="aPrompt">你是教学助手。请依据以下参考资料回答学生问题，未提供资料时说明无法从资料确认。
+
+参考资料:
+{{context}}
+
+学生问题: {{question}}</textarea></div>
+      <button class="act" onclick="createApp()">创建草稿</button>
+      <span id="aMsg" class="err"></span>
+    </div>
+    <div class="card"><h2>应用列表</h2>
+      <table id="appTable"><thead><tr><th>ID</th><th>名称</th><th>状态</th><th>版本</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card hidden" id="debugBox">
+      <h3>调试：<span id="debugAppName"></span>（按草稿配置运行）</h3>
+      <div class="row">
+        <input id="debugQ" placeholder="输入调试问题" style="flex:1">
+        <button class="act" onclick="debugRun()">运行</button>
+      </div>
+      <div id="debugAnswer" style="min-height:40px;white-space:pre-wrap;font-size:14px"></div>
+      <pre id="debugRefs" class="refs hidden"></pre>
+    </div>
+  </section>
+
+  <!-- 模型 -->
+  <section id="tab-models" class="hidden">
+    <div class="card"><h2>模型接入与连通性</h2>
+      <div id="modelList"></div>
+    </div>
+  </section>
+</main>
+<script>
+const TOKEN = sessionStorage.getItem("token");
+const ROLE = sessionStorage.getItem("role");
+const IS_ADMIN = ROLE === "admin";
+document.getElementById("whoami").textContent = sessionStorage.getItem("name") || "";
+document.getElementById("roleBadge").textContent = ROLE === "admin" ? " · 管理员" : " · 教师";
+if (!TOKEN || (ROLE !== "teacher" && ROLE !== "admin")) location.href = "/";
+if (IS_ADMIN) document.getElementById("modelsTabBtn").classList.remove("hidden");
+
+function logout() { sessionStorage.clear(); location.href = "/"; }
+function headers() { return { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" }; }
+
+async function api(method, path, body) {
+  const opts = { method, headers: headers() };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401) { logout(); throw { code: "unauthorized", message: "登录已失效" }; }
+  if (!r.ok) throw { status: r.status, code: d.error ? d.error.code : "error", message: d.error ? d.error.message : "请求失败" };
+  return d;
+}
+
+document.querySelectorAll("nav.tabs button").forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll("nav.tabs button").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    document.querySelectorAll("main > section").forEach((s) => s.classList.add("hidden"));
+    document.getElementById(b.dataset.tab).classList.remove("hidden");
+  };
+});
+
+function qTypeChanged() {
+  const type = document.getElementById("qType").value;
+  document.getElementById("qOptionsBox").classList.toggle("hidden", type !== "single");
+  document.getElementById("qAnswerRow").classList.toggle("hidden", type !== "single");
+  document.getElementById("qJudgeAnswerRow").classList.toggle("hidden", type !== "judge");
+}
+
+async function createQuestion() {
+  const msg = document.getElementById("qMsg");
+  msg.textContent = "";
+  const type = document.getElementById("qType").value;
+  const body = {
+    type, stem: document.getElementById("qStem").value,
+    correct_answer: type === "single" ? document.getElementById("qAnswer").value
+                                      : document.getElementById("qJudgeAnswer").value,
+    default_score: parseInt(document.getElementById("qScore").value || "0", 10),
+    level_code: document.getElementById("qLevel").value,
+    tags: document.getElementById("qTags").value.split(",").map((s) => s.trim()).filter(Boolean),
+  };
+  if (type === "single") {
+    body.options = ["A", "B", "C", "D"].map((k) => ({ key: k, text: document.getElementById("opt" + k).value }));
+  }
+  try {
+    await api("POST", "/api/exam/questions", body);
+    msg.className = "ok"; msg.textContent = "创建成功";
+    loadQuestions();
+  } catch (e) { msg.className = "err"; msg.textContent = e.message; }
+}
+
+async function loadQuestions() {
+  const d = await api("GET", "/api/exam/questions");
+  const tbody = document.querySelector("#qTable tbody");
+  tbody.innerHTML = "";
+  window.questionCache = d.questions;
+  for (const q of d.questions) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${q.id}</td><td>${q.type === "single" ? "单选" : "判断"}</td>
+      <td>${q.stem}</td><td>${q.correct_answer}</td><td>${q.default_score}</td>
+      <td>${q.level_code || "-"}</td>
+      <td><span class="badge ${q.status === "active" ? "ok" : "err"}">${q.status}</span></td>
+      <td>${q.status === "active" ? `<button class="act red" onclick="disableQuestion(${q.id})">停用</button>` : ""}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+async function disableQuestion(id) {
+  try { await api("DELETE", "/api/exam/questions/" + id); loadQuestions(); }
+  catch (e) { alert(e.message); }
+}
+
+/* ---------- 考试 ---------- */
+async function createExam() {
+  const msg = document.getElementById("eMsg");
+  msg.textContent = "";
+  const fmt = (id) => { const v = document.getElementById(id).value;
+    return v ? new Date(v).toISOString() : null; };
+  const body = { title: document.getElementById("eTitle").value,
+    level_code: document.getElementById("eLevel").value,
+    open_at: fmt("eOpen"), close_at: fmt("eClose"),
+    duration_seconds: parseInt(document.getElementById("eDur").value || "0", 10) || null };
+  try {
+    await api("POST", "/api/exam/exams", body);
+    msg.className = "ok"; msg.textContent = "草稿已创建，请在下方设置试卷条目后发布";
+    loadExams();
+  } catch (e) { msg.className = "err"; msg.textContent = e.message; }
+}
+
+async function loadExams() {
+  const d = await api("GET", "/api/exam/exams");
+  window.examCache = d.exams;
+  const tbody = document.querySelector("#eTable tbody");
+  tbody.innerHTML = "";
+  for (const e of d.exams) {
+    const tr = document.createElement("tr");
+    const win = e.open_at && e.close_at ? fmtTime(e.open_at) + " ~ " + fmtTime(e.close_at) : "未设置";
+    tr.innerHTML = `<td>${e.id}</td><td>${e.title}</td>
+      <td><span class="badge ${e.status === "published" ? "ok" : "warn"}">${e.status}</span></td>
+      <td>${win}</td><td>${e.total_score}</td>
+      <td>${e.status === "draft" ? `
+        <button class="act" onclick="openItems(${e.id})">选题与分值</button>
+        <button class="act green" onclick="publishExam(${e.id})">发布</button>
+        <button class="act red" onclick="deleteExam(${e.id})">删除</button>` : `
+        <button class="act gray" onclick="showResults(${e.id}, '${e.title}')">成绩</button>`}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function openItems(examId) {
+  const e = (window.examCache || []).find((x) => x.id === examId);
+  document.getElementById("itemsExamTitle").textContent = e ? e.title : examId;
+  document.getElementById("itemsEditor").classList.remove("hidden");
+  const box = document.getElementById("itemCandidates");
+  box.innerHTML = "";
+  for (const q of (window.questionCache || []).filter((q) => q.status === "active")) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<label style="min-width:420px">
+      <input type="checkbox" data-qid="${q.id}" onchange="void 0"> #${q.id} [${q.type === "single" ? "单选" : "判断"}] ${q.stem}（答案 ${q.correct_answer}）</label>
+      <label>分值 <input type="number" class="scoreFor" data-qid="${q.id}" value="${q.default_score}" min="0" style="width:70px"></label>`;
+    box.appendChild(row);
+  }
+  window.currentItemsExam = examId;
+}
+
+async function saveItems() {
+  const msg = document.getElementById("itemsMsg");
+  msg.textContent = "";
+  const items = [];
+  let order = 1;
+  document.querySelectorAll("#itemCandidates input[type=checkbox]:checked").forEach((cb) => {
+    const qid = parseInt(cb.dataset.qid, 10);
+    const score = parseInt(document.querySelector(`.scoreFor[data-qid="${qid}"]`).value || "0", 10);
+    items.push({ source_question_id: qid, order_no: order++, score });
+  });
+  try {
+    await api("PUT", `/api/exam/exams/${window.currentItemsExam}/items`, { items });
+    msg.className = "ok"; msg.textContent = "条目已保存（共 " + items.length + " 题）";
+    loadExams();
+  } catch (e) { msg.className = "err"; msg.textContent = e.message; }
+}
+
+async function publishExam(id) {
+  try { await api("POST", `/api/exam/exams/${id}/publish`); loadExams(); }
+  catch (e) { alert(e.message); }
+}
+async function deleteExam(id) {
+  if (!confirm("确认删除该草稿？")) return;
+  try { await api("DELETE", `/api/exam/exams/${id}`); loadExams(); } catch (e) { alert(e.message); }
+}
+async function showResults(id, title) {
+  document.getElementById("resultsExamTitle").textContent = title;
+  document.getElementById("resultsBox").classList.remove("hidden");
+  const d = await api("GET", `/api/exam/exams/${id}/results`);
+  const tbody = document.querySelector("#rTable tbody");
+  tbody.innerHTML = "";
+  for (const r of d.results) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.login_name}</td>
+      <td><span class="badge ${r.status === "submitted" ? "ok" : "warn"}">${r.status}</span></td>
+      <td>${r.total_score != null ? r.total_score : "-"}</td>
+      <td>${r.submitted_at ? fmtTime(r.submitted_at) : "-"}</td><td>${r.submit_reason || "-"}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ---------- 知识库 ---------- */
+async function createKB() {
+  const msg = document.getElementById("kbMsg");
+  msg.textContent = "";
+  try {
+    await api("POST", "/api/kb", { name: document.getElementById("kbName").value,
+      description: document.getElementById("kbDesc").value });
+    loadKBs();
+  } catch (e) { msg.textContent = e.message; }
+}
+
+async function loadKBs() {
+  const d = await api("GET", "/api/kb");
+  const sel = document.getElementById("uploadKb");
+  sel.innerHTML = "";
+  const box = document.getElementById("kbList");
+  box.innerHTML = "";
+  for (const k of d.knowledge_bases) {
+    const opt = document.createElement("option");
+    opt.value = k.id; opt.textContent = `#${k.id} ${k.name}（${k.doc_count} 篇文档）`;
+    sel.appendChild(opt);
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.boxShadow = "none"; card.style.border = "1px solid #e5e7eb";
+    card.innerHTML = `<h3>#${k.id} ${k.name} <span class="meta">${k.description || ""}</span>
+      <span class="badge ok">${k.doc_count} 篇</span>
+      <span class="meta">Embedding 维度: ${k.embedding_dimension ?? "未测定"}</span></h3>`;
+    const docs = document.createElement("div");
+    card.appendChild(docs);
+    box.appendChild(card);
+
+    api("GET", `/api/kb/${k.id}`).then((dd) => {
+      for (const doc of dd.documents) {
+        const row = document.createElement("div");
+        row.className = "row";
+        const badge = doc.status === "ready" ? '<span class="badge ok">ready</span>'
+          : doc.status === "failed" ? `<span class="badge err">failed: ${doc.failure_reason || ""}</span>`
+          : `<span class="badge warn">${doc.status}</span>`;
+        row.innerHTML = `<span style="min-width:200px">${doc.display_name}</span> ${badge}
+          <span class="meta">${doc.char_count} 字符 · 重试 ${doc.retry_count} 次</span>
+          <button class="act gray" onclick="disableDoc(${k.id}, ${doc.id})">停用</button>`;
+        docs.appendChild(row);
+      }
+    });
+  }
+}
+async function disableDoc(kbId, docId) {
+  try { await api("DELETE", `/api/kb/${kbId}/documents/${docId}`); loadKBs(); } catch (e) { alert(e.message); }
+}
+async function uploadDoc() {
+  const kbId = document.getElementById("uploadKb").value;
+  const file = document.getElementById("uploadFile").files[0];
+  const msg = document.getElementById("kbMsg");
+  msg.textContent = "";
+  if (!file) { msg.textContent = "请选择文件"; return; }
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch(`/api/kb/${kbId}/documents`, { method: "POST", headers: { "Authorization": "Bearer " + TOKEN }, body: fd });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { msg.textContent = d.error ? d.error.message : "上传失败"; return; }
+  msg.className = "ok"; msg.textContent = `上传成功：${d.document.display_name}（状态 ${d.document.status}${d.existing ? "，复用已有文档" : ""}）`;
+  loadKBs();
+}
+
+/* ---------- 问答应用 ---------- */
+async function createApp() {
+  const msg = document.getElementById("aMsg");
+  msg.textContent = "";
+  try {
+    await api("POST", "/api/apps", { name: document.getElementById("aName").value,
+      config: { knowledge_base_id: parseInt(document.getElementById("aKb").value, 10),
+        prompt: document.getElementById("aPrompt").value,
+        top_k: parseInt(document.getElementById("aTopK").value || "5", 10),
+        history_turns: parseInt(document.getElementById("aHistory").value || "3", 10) } });
+    loadApps();
+  } catch (e) { msg.textContent = e.message; }
+}
+
+async function loadApps() {
+  const d = await api("GET", "/api/apps");
+  const tbody = document.querySelector("#appTable tbody");
+  tbody.innerHTML = "";
+  window.appCache = d.apps;
+  for (const a of d.apps) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${a.id}</td><td>${a.name}</td>
+      <td><span class="badge ${a.status === "published" ? "ok" : "warn"}">${a.status}</span></td>
+      <td>${a.published_revision}</td>
+      <td>${a.status !== "disabled" ? `
+        <button class="act" onclick="openDebug(${a.id})">调试</button>` : ""}
+        ${a.status === "draft" ? `<button class="act green" onclick="publishApp(${a.id})">发布</button>` : ""}</td>`;
+    tbody.appendChild(tr);
+  }
+  // 知识库下拉
+  const kbd = await api("GET", "/api/kb");
+  const sel = document.getElementById("aKb");
+  sel.innerHTML = "";
+  for (const k of kbd.knowledge_bases) {
+    const opt = document.createElement("option");
+    opt.value = k.id; opt.textContent = `#${k.id} ${k.name}`;
+    sel.appendChild(opt);
+  }
+}
+async function publishApp(id) {
+  try { await api("POST", `/api/apps/${id}/publish`); loadApps(); } catch (e) { alert(e.message); }
+}
+async function openDebug(id) {
+  const a = (window.appCache || []).find((x) => x.id === id);
+  document.getElementById("debugAppName").textContent = `#${a.id} ${a.name}`;
+  document.getElementById("debugAnswer").textContent = "";
+  const refs = document.getElementById("debugRefs");
+  refs.classList.add("hidden"); refs.textContent = "";
+  document.getElementById("debugBox").classList.remove("hidden");
+  window.debugAppId = id;
+}
+
+async function debugRun() {
+  const q = document.getElementById("debugQ").value.trim();
+  if (!q) return;
+  const out = document.getElementById("debugAnswer");
+  const refs = document.getElementById("debugRefs");
+  out.textContent = "";
+  refs.classList.add("hidden");
+  out.textContent = "（生成中...）";
+  try {
+    const r = await fetch(`/api/apps/${window.debugAppId}/run`, {
+      method: "POST", headers: headers(), body: JSON.stringify({ question: q }) });
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", type = null, data = "";
+    const handle = (t, payload) => {
+      if (t === "delta") { if (out.textContent.endsWith("（生成中...）")) out.textContent = "";
+        out.textContent += payload.text; }
+      else if (t === "references") {
+        refs.classList.remove("hidden");
+        refs.textContent = "引用:\n" + payload.references.map((x) =>
+          `[${x.chunk_id}] 《${x.title}》 offset(${x.start_offset},${x.end_offset})`).join("\n");
+      } else if (t === "error") { out.textContent += "\n[错误] " + payload.code + ": " + payload.message; }
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, idx); buf = buf.slice(idx + 1);
+        if (line.startsWith("event: ")) type = line.slice(7).trim();
+        else if (line.startsWith("data: ")) data += line.slice(6);
+        else if (line === "" && type !== null) { handle(type, data ? JSON.parse(data) : {}); type = null; data = ""; }
+      }
+    }
+  } catch (e) {
+    out.textContent = "运行失败: " + (e.message || "网络错误");
+  }
+}
+
+/* ---------- 模型 ---------- */
+async function loadModels() {
+  if (!IS_ADMIN) return;
+  const d = await api("GET", "/api/admin/models");
+  const box = document.getElementById("modelList");
+  box.innerHTML = "";
+  for (const m of d.models) {
+    const card = document.createElement("div");
+    card.className = "card"; card.style.boxShadow = "none"; card.style.border = "1px solid #e5e7eb";
+    card.innerHTML = `<h3>${m.name} <span class="badge">${m.kind}</span>
+      <span class="badge ${m.enabled ? "ok" : "err"}">${m.enabled ? "enabled" : "disabled"}</span></h3>
+      <div class="meta">模型: ${m.model_name} · 端点: ${m.base_url} · 凭据引用: ${m.credential_ref}
+      · 配置版本: ${m.config_version}${m.embedding_dimension ? " · 向量维度: " + m.embedding_dimension : ""}</div>
+      <button class="act" onclick="testModel('${m.kind}')">连通性测试</button>
+      <span id="mt-${m.kind}" class="ok"></span><span id="me-${m.kind}" class="err"></span>`;
+    box.appendChild(card);
+  }
+  if (d.models.length === 0) box.innerHTML = '<p class="meta">尚未配置模型（APP_CHAT_* / APP_EMBEDDING_*）</p>';
+}
+async function testModel(kind) {
+  const ok = document.getElementById("mt-" + kind);
+  const err = document.getElementById("me-" + kind);
+  ok.textContent = ""; err.textContent = "";
+  try {
+    const d = await api("POST", `/api/admin/models/${kind}/test`);
+    ok.textContent = kind === "chat"
+      ? `连通 OK，耗时 ${d.latency_ms}ms，样例: ${d.sample}`
+      : `连通 OK，耗时 ${d.latency_ms}ms，向量维度 ${d.dimension}`;
+  } catch (e) { err.textContent = "失败: " + (e.message || e.code); }
+}
+
+function fmtTime(s) { return new Date(s).toLocaleString("zh-CN", { hour12: false }); }
+
+loadQuestions(); loadExams(); loadKBs(); loadApps(); loadModels();
+</script>
+</body>
+</html>

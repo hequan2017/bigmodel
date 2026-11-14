@@ -46,8 +46,7 @@ document.getElementById("login").onsubmit = async (e) => {
     sessionStorage.setItem("role", d.user.role);
     sessionStorage.setItem("name", d.user.login_name);
     if (d.user.role === "student") { location.href = "/exam.html"; return; }
-    msg.style.color = "#059669";
-    msg.textContent = "登录成功。教师/管理员端页面不在本期范围（P0 仅交付学生端考试页面），请使用 API。";
+    location.href = "/teacher.html";
   } catch (err) {
     msg.textContent = "网络错误，请稍后重试";
   }
