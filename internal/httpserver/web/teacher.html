@@ -116,6 +116,7 @@
       <h3>成绩列表：<span id="resultsExamTitle"></span></h3>
       <table id="rTable"><thead><tr><th>学生</th><th>状态</th><th>总分</th><th>提交时间</th><th>提交原因</th><th></th></tr></thead><tbody></tbody></table>
       <button class="act" onclick="showStats()">答题统计</button>
+      <button class="act gray" onclick="exportCSV()">导出成绩 CSV</button>
       <div id="statsBox" class="hidden" style="margin-top:14px"><div id="statsSummary" class="meta"></div>
         <table id="statsTable"><thead><tr><th>题号</th><th>题干</th><th>作答人数</th><th>答对</th><th>答错</th><th>错误率</th></tr></thead><tbody></tbody></table>
       </div>
@@ -578,6 +579,22 @@ async function debugRun() {
 }
 
 /* ---------- 作答详情与文档片段 ---------- */
+async function exportCSV() {
+  try {
+    const r = await fetch(`/api/exam/exams/${window.currentResultsExam}/results/export`,
+      { headers: { Authorization: "Bearer " + TOKEN } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `results_${window.currentResultsExam}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { alert("导出失败: " + (e.message || "网络错误")); }
+}
+
 async function showStats() {
   const box = document.getElementById("statsBox");
   box.classList.remove("hidden");

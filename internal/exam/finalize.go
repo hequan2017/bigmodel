@@ -245,3 +245,40 @@ func (s *Service) ListExamResults(ctx context.Context, userID int64, isAdmin boo
 	}
 	return out, rows.Err()
 }
+
+// ResultsCSV 导出教师成绩为 CSV（含 UTF-8 BOM，便于 Excel 识别中文）。
+func (s *Service) ResultsCSV(ctx context.Context, userID int64, isAdmin bool, examID int64) ([]byte, error) {
+	rows, err := s.ListExamResults(ctx, userID, isAdmin, examID)
+	if err != nil {
+		return nil, err
+	}
+	var b strings.Builder
+	b.WriteString("\ufeff登录名,状态,总分,提交时间,提交原因,答案版本\r\n")
+	for _, r := range rows {
+		submitted := ""
+		if r.SubmittedAt != nil {
+			submitted = r.SubmittedAt.Format("2006-01-02 15:04:05")
+		}
+		total := ""
+		if r.TotalScore != nil {
+			total = fmt.Sprintf("%d", *r.TotalScore)
+		}
+		line := []string{
+			r.LoginName, r.Status, total, submitted, r.SubmitReason,
+			fmt.Sprintf("%d", r.AnswerRevision),
+		}
+		for i, f := range line {
+			line[i] = csvField(f)
+		}
+		b.WriteString(strings.Join(line, ",") + "\r\n")
+	}
+	return []byte(b.String()), nil
+}
+
+// csvField 转义含逗号/引号/换行的字段。
+func csvField(s string) string {
+	if strings.ContainsAny(s, ",\"\r\n") {
+		return "\"" + strings.ReplaceAll(s, "\"", "\"\"") + "\""
+	}
+	return s
+}

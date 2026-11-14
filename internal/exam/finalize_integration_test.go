@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -187,4 +188,59 @@ func attemptIDOf(t *testing.T, pool *pgxpool.Pool, userID, examID int64) int64 {
 		t.Fatalf("查询作答 ID: %v", err)
 	}
 	return id
+}
+
+func TestResultsCSVIntegration(t *testing.T) {
+	svc, pool := newTestService(t)
+	ctx := context.Background()
+
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	teacherID := createExamUser(t, pool, "itest_csv_t_"+suffix, "teacher")
+	studentID := createExamUser(t, pool, "itest_csv_s_"+suffix, "student")
+
+	examID, item1ID, item2ID := seedPublishedExam(t, svc, teacherID, "CSV 导出测试", -time.Hour, time.Hour, time.Hour)
+	if _, err := svc.StartAttempt(ctx, studentID, examID); err != nil {
+		t.Fatalf("开始: %v", err)
+	}
+	if _, _, err := svc.SaveAttemptAnswers(ctx, studentID, examID, SaveAnswersInput{
+		ExpectedRevision: 1,
+		Answers:          []AnswerInput{{ItemID: item1ID, Answer: "A"}, {ItemID: item2ID, Answer: "true"}},
+	}); err != nil {
+		t.Fatalf("保存: %v", err)
+	}
+	if _, err := svc.SubmitAttempt(ctx, studentID, examID, 2); err != nil {
+		t.Fatalf("交卷: %v", err)
+	}
+
+	data, err := svc.ResultsCSV(ctx, teacherID, false, examID)
+	if err != nil {
+		t.Fatalf("导出: %v", err)
+	}
+	text := strings.TrimPrefix(string(data), "\ufeff")
+	lines := strings.Split(strings.TrimRight(text, "\r\n"), "\r\n")
+	if len(lines) != 2 {
+		t.Fatalf("应为表头+1 行, got %d 行: %q", len(lines), text)
+	}
+	if !strings.HasPrefix(lines[0], "登录名,状态,总分") {
+		t.Errorf("表头错误: %q", lines[0])
+	}
+	if !strings.Contains(lines[1], fmt.Sprintf("itest_csv_s_%s", suffix)) ||
+		!strings.Contains(lines[1], "submitted") || !strings.Contains(lines[1], "10") {
+		t.Errorf("数据行错误: %q", lines[1])
+	}
+
+	// 越权：其他教师不可导出。
+	other := createExamUser(t, pool, "itest_csv_o_"+suffix, "teacher")
+	if _, err := svc.ResultsCSV(ctx, other, false, examID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("越权导出应 404, got %v", err)
+	}
+}
+
+func TestCSVFieldEscaping(t *testing.T) {
+	if got := csvField("a,\"b\"\nc"); got != "\"a,\"\"b\"\"\nc\"" {
+		t.Errorf("转义错误: %q", got)
+	}
+	if got := csvField("plain"); got != "plain" {
+		t.Errorf("普通字段不应加引号: %q", got)
+	}
 }

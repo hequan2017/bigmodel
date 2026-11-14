@@ -93,6 +93,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, log *slog.Logger, models *model.
 	mux.HandleFunc("GET /api/exam/exams/{id}/results", s.requireAuth(s.requireRole(s.handleExamResults, kbRoles...)))
 	mux.HandleFunc("GET /api/exam/exams/{id}/attempts/{attemptID}", s.requireAuth(s.requireRole(s.handleAttemptDetail, kbRoles...)))
 	mux.HandleFunc("GET /api/exam/exams/{id}/stats", s.requireAuth(s.requireRole(s.handleExamStats, kbRoles...)))
+	mux.HandleFunc("GET /api/exam/exams/{id}/results/export", s.requireAuth(s.requireRole(s.handleResultsExport, kbRoles...)))
 	mux.HandleFunc("GET /api/exam/available", s.requireAuth(s.requireRole(s.handleAvailableExams, auth.RoleStudent)))
 
 	// 学生端页面同源托管（§15.1）；非 GET 的根路径仍走统一 JSON 404。

@@ -487,3 +487,23 @@ func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
 	}
 	api.WriteJSON(w, http.StatusOK, map[string]any{"events": events})
 }
+
+// handleResultsExport 导出成绩 CSV（教师/管理员）。
+func (s *Server) handleResultsExport(w http.ResponseWriter, r *http.Request) {
+	current := auth.UserFromContext(r.Context())
+	examID, ok := pathID(r, "id")
+	if !ok {
+		api.WriteError(w, r, http.StatusBadRequest, "bad_request", "考试 ID 非法")
+		return
+	}
+	data, err := s.exam.ResultsCSV(r.Context(), current.ID, current.Role == auth.RoleAdmin, examID)
+	if err != nil {
+		s.handleExamError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("attachment; filename=\"results_%d.csv\"", examID))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
